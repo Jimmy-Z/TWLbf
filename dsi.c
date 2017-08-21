@@ -112,6 +112,11 @@ void dsi_brute_emmc_cid(const u8 *console_id, const u8 *emmc_cid_template, const
 	*(u32*)(emmc_cid + 1) = 0xffffffffu;
 	hexdump(emmc_cid, 16, 0);
 
+	u8 target_xor[16];
+   	xor_128((u64*)target_xor, (u64*)src, (u64*)ver);
+	u8 target_xor_reversed[16];
+	byte_reverse_16(target_xor_reversed, target_xor);
+
 	aes_128_ecb_init();
 
 	u64 key[2];
@@ -133,14 +138,10 @@ void dsi_brute_emmc_cid(const u8 *console_id, const u8 *emmc_cid_template, const
 		add_128_64((u64*)emmc_cid_sha1, offset);
 		byte_reverse_16(ctr, emmc_cid_sha1);
 
-		u8 xor_stream[16], xor_stream_reversed[16];
-		aes_128_ecb_crypt(xor_stream, ctr);
-		byte_reverse_16(xor_stream_reversed, xor_stream);
+		u8 xor[16];
+		aes_128_ecb_crypt(xor, ctr);
 
-		u8 out[16];
-		xor_128((u64*)out, (u64*)src, (u64*)xor_stream_reversed);
-
-		if(!memcmp(out, ver, 16)){
+		if(!memcmp(target_xor_reversed, xor, 16)){
 			printf("got a hit: ");
 			hexdump(emmc_cid, 16, 0);
 			break;
@@ -148,3 +149,4 @@ void dsi_brute_emmc_cid(const u8 *console_id, const u8 *emmc_cid_template, const
 	}
 	printf("%.2f seconds\n", difftime(time(0), start));
 }
+

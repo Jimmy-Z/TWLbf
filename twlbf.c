@@ -7,6 +7,24 @@
 #include "dsi.h"
 #include "crypto.h"
 
+static void aes_128_ecb_test(){
+	// aes_128_ecb test
+	u8 test_src[16] = {1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8};
+	u8 test_key[16] = {8, 7, 6, 5, 4, 3, 2, 1, 8, 7, 6, 5, 4, 3, 2, 1};
+	u8 out[16];
+
+	aes_128_ecb_init();
+	aes_128_ecb_set_key(test_key);
+
+	// so as expected this is reusable
+	aes_128_ecb_crypt(out, test_src);
+	printf("aes_128_ecb test 0: ");
+	hexdump(out, 16, 1);
+	aes_128_ecb_crypt(out, test_key);
+	printf("aes_128_ecb test 1: ");
+	hexdump(out, 16, 1);
+}
+
 int main(int argc, const char *argv[]){
 	if(argc == 6 && !strcmp(argv[1], "crypt")){
 		// twlbf crypt [Console ID] [EMMC CID] [src] [offset]
@@ -29,5 +47,6 @@ int main(int argc, const char *argv[]){
 		dsi_brute_emmc_cid(console_id, emmc_cid, src, ver, u16be(offset));
 	}else{
 		fprintf(stderr, "invalid parameters\n");
+		aes_128_ecb_test();
 	}
 }
