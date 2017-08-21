@@ -18,7 +18,7 @@ int htoi(char a){
 	}
 }
 
-u64 u64be(u8 *in){
+u64 u64be(const u8 *in){
 	u64 out;
 	u8 *out8 = (u8*)&out;
 	out8[0] = in[7];
@@ -32,7 +32,7 @@ u64 u64be(u8 *in){
 	return out;
 }
 
-u32 u32be(u8 *in){
+u32 u32be(const u8 *in){
 	u32 out;
 	u8 *out8 = (u8*)&out;
 	out8[0] = in[3];
@@ -42,7 +42,7 @@ u32 u32be(u8 *in){
 	return out;
 }
 
-u16 u16be(u8 *in){
+u16 u16be(const u8 *in){
 	u16 out;
 	u8 *out8 = (u8*)&out;
 	out8[0] = in[1];
@@ -70,23 +70,19 @@ void byte_reverse_16(u8 *out, const u8 *in){
 	out[15] = in[0];
 }
 
-int hex2bytes(u8 *out, size_t byte_len, const char *in, int verbose, int critical){
+int hex2bytes(u8 *out, size_t byte_len, const char *in, int critical){
 	if (strlen(in) != byte_len << 1){
-		if(verbose){
-			fprintf(stderr, "%s: invalid input length, expecting %llu, got %llu.\n",
-				__FUNCTION__, byte_len << 1, strlen(in));
-		}
-		assert(critical);
+		fprintf(stderr, "%s: invalid input length, expecting %llu, got %llu.\n",
+			__FUNCTION__, byte_len << 1, strlen(in));
+		assert(!critical);
 		return -1;
 	}
 	for(size_t i = 0; i < byte_len; ++i){
 		int h = htoi(*in++), l = htoi(*in++);
 		if(h == -1 || l == -1){
-			if(verbose){
-				fprintf(stderr, "%s: invalid input \"%c%c\"\n",
-					__FUNCTION__, *(in - 2), *(in - 1));
-			}
-			assert(critical);
+			fprintf(stderr, "%s: invalid input \"%c%c\"\n",
+				__FUNCTION__, *(in - 2), *(in - 1));
+			assert(!critical);
 			return -2;
 		}
 		*out++ = (h << 4) + l;

@@ -3,6 +3,6 @@
 
 #include "common.h"
 
-void dsi_make_key_from_console_id(u64 *key, u64 console_id);
+void dsi_aes_ctr_crypt_block(const u8 *console_id, const u8 *emmc_cid, const u8 *src, u16 offset);
 
-void dsi_aes_ctr_crypt_block(u8 *out, const u8 *in, const u8 *key, const u8 *iv, size_t offset);
+void dsi_brute_emmc_cid(const u8 *console_id, const u8 *emmc_cid_template, const u8 *src, const u8 *ver, u16 offset);
