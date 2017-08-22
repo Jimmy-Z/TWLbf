@@ -7,6 +7,14 @@
 #include "utils.h"
 #include "crypto.h"
 
+#define DSI_PROFILE 0
+#if DSI_PROFILE
+#include <sys/time.h>
+long long time_diff(const struct timeval *t1, const struct timeval *t0){
+	return (t1->tv_sec - t0->tv_sec) * 1000000ll + (t1->tv_usec - t0->tv_usec);
+}
+#endif
+
 // references:
 // http://problemkaputt.de/gbatek.htm
 // https://github.com/WinterMute/twltool
@@ -153,7 +161,11 @@ void dsi_aes_ctr_crypt_block(const u8 *console_id, const u8 *emmc_cid, const u8 
 }
 
 #define BLOCK_SIZE 16
+#if DSI_PROFILE
+#define CHUNK_BITS 22
+#else
 #define CHUNK_BITS 12
+#endif
 #define CHUNK_LEN (1 << CHUNK_BITS)
 #define CHUNK_COUNT (1 << (32 - CHUNK_BITS))
 
@@ -172,11 +184,12 @@ void dsi_brute_emmc_cid(const u8 *console_id, const u8 *emmc_cid_template, const
 	*(u32*)(emmc_cid + 1) = 0xffffffffu;
 	hexdump(emmc_cid, 16, 0);
 
+	printf("chunk size: %d bytes\n", BLOCK_SIZE * CHUNK_LEN);
+
 	u8 target_xor[16];
    	xor_128((u64*)target_xor, (u64*)src, (u64*)ver);
-	u8 target_xor_reversed[16];
-	byte_reverse_16(target_xor_reversed, target_xor);
-	// hexdump(target_xor_reversed, 16, 1);
+	u64 target_xor_l64 = u64be(target_xor + 8);
+	u64 target_xor_h64 = u64be(target_xor);
 
 	u64 key[2];
 	dsi_make_key_from_console_id(key, u64be(console_id));
@@ -187,36 +200,56 @@ void dsi_brute_emmc_cid(const u8 *console_id, const u8 *emmc_cid_template, const
 
 	u64 offset64 = u16be(offset);
 
+#if DSI_PROFILE
+	struct timeval t0, t1, t2, t3;
+#endif
+
 	int succeed = 0;
 	u8 *ctr_chunk = malloc(BLOCK_SIZE * CHUNK_LEN);
 	u8 *xor_chunk = malloc(BLOCK_SIZE * CHUNK_LEN);
 	for (unsigned i = 0; i < CHUNK_COUNT; ++i){
+
+		*(u32*)(emmc_cid + 1) = i << CHUNK_BITS;
 		if(!(i << (CHUNK_BITS + 8))){
-			*(u32*)(emmc_cid + 1) = i << CHUNK_BITS;
 			fputs("testing ", stdout);
 			hexdump(emmc_cid, 16, 0);
 		}
+#if DSI_PROFILE
+		gettimeofday(&t0, NULL);
+#endif
 		for(unsigned j = 0; j < CHUNK_LEN; ++j){
-			*(u32*)(emmc_cid + 1) = (i << CHUNK_BITS) + j;
-			// printf("0x%08x\n", *(u32*)(emmc_cid + 1));
 			u8 emmc_cid_sha1[20];
 			sha1(emmc_cid_sha1, emmc_cid, 16);
 			add_128_64((u64*)emmc_cid_sha1, offset64);
 			byte_reverse_16(ctr_chunk + BLOCK_SIZE * j, emmc_cid_sha1);
+			*(u32*)(emmc_cid + 1) += 1;
 		}
-
+#if DSI_PROFILE
+		gettimeofday(&t1, NULL);
+#endif
 		aes_128_ecb_crypt(xor_chunk, ctr_chunk, BLOCK_SIZE * CHUNK_LEN);
-
+#if DSI_PROFILE
+		gettimeofday(&t2, NULL);
+#endif
+		u64 *p_l = (u64*)xor_chunk, *p_h = (u64*)(xor_chunk + 8);
 		for(unsigned j = 0; j < CHUNK_LEN; ++j){
 			// hexdump(xor_chunk + BLOCK_SIZE * j, 16, 1);
-			if(!memcmp(target_xor_reversed, xor_chunk + BLOCK_SIZE * j, 16)){
+			if(*p_l == target_xor_l64 && *p_h == target_xor_h64){
 				fputs("got a hit: ", stdout);
 				*(u32*)(emmc_cid + 1) = (i << CHUNK_BITS) + j;
 				hexdump(emmc_cid, 16, 0);
 				succeed = 1;
 				break;
 			}
+			p_l += 2;
+			p_h += 2;
 		}
+#if DSI_PROFILE
+		gettimeofday(&t3, NULL);
+		printf("SHA1: %lld\nAES: %lld\nmemcmp: %lld\n",
+				time_diff(&t1, &t0), time_diff(&t2, &t1), time_diff(&t3, &t2));
+		return;
+#endif
 		if(succeed){
 			break;
 		}
