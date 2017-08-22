@@ -120,7 +120,8 @@ static inline void dsi_make_key_from_console_id(u64 *key, u64 console_id){
 	dsi_make_key(key, (u64*)key_x);
 }
 
-void dsi_aes_ctr_crypt_block(const u8 *console_id, const u8 *emmc_cid, const u8 *src, const u8 *offset){
+void dsi_aes_ctr_crypt_block(const u8 *console_id, const u8 *emmc_cid,
+	const u8 *src, const u8 *offset){
 	crypto_init();
 	u64 key[2];
 	dsi_make_key_from_console_id(key, u64be(console_id));
@@ -169,7 +170,8 @@ void dsi_aes_ctr_crypt_block(const u8 *console_id, const u8 *emmc_cid, const u8 
 #define CHUNK_LEN (1 << CHUNK_BITS)
 #define CHUNK_COUNT (1 << (32 - CHUNK_BITS))
 
-void dsi_brute_emmc_cid(const u8 *console_id, const u8 *emmc_cid_template, const u8 *src, const u8 *ver, const u8 *offset){
+void dsi_brute_emmc_cid(const u8 *console_id, const u8 *emmc_cid_template,
+	const u8 *src, const u8 *ver, const u8 *offset){
 	u8 emmc_cid[16];
 	memcpy(emmc_cid, emmc_cid_template, sizeof(emmc_cid));
 
@@ -259,7 +261,8 @@ void dsi_brute_emmc_cid(const u8 *console_id, const u8 *emmc_cid_template, const
 	printf("%.2f seconds\n", difftime(time(0), start));
 }
 
-void dsi_brute_console_id(const u8 *console_id_template, const u8 *emmc_cid, const u8 *src, const u8 *ver, const u8 *offset){
+void dsi_brute_console_id(const u8 *console_id_template, const u8 *emmc_cid,
+	const u8 *src, const u8 *ver, const u8 *offset){
 	time_t start = time(0);
 
 	crypto_init();
@@ -279,9 +282,9 @@ void dsi_brute_console_id(const u8 *console_id_template, const u8 *emmc_cid, con
 
 	for (u32 i = 0; i <= 0xffffffffu; ++i){
 		// brute through the lower 32 bits
-		*(u32*)console_id = i;
-		if(!(i << 24)){
-			printf("testing %016llx\n", console_id);
+		*(u32*)&console_id = i;
+		if(!(i << 8)){
+			printf("testing %016llx\n", (long long unsigned)console_id);
 		}
 		u64 key[2];
 		dsi_make_key_from_console_id(key, console_id);
@@ -294,7 +297,7 @@ void dsi_brute_console_id(const u8 *console_id_template, const u8 *emmc_cid, con
 		aes_128_ecb_crypt_1((u8*)xor, ctr);
 
 		if(xor[0] == target_xor_l64 && xor[1] == target_xor_h64){
-			printf("got a hit: %016llx\n", console_id);
+			printf("got a hit: %016llx\n", (long long unsigned)console_id);
 			break;
 		}
 	}
