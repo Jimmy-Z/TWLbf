@@ -27,26 +27,24 @@ int main(int argc, const char *argv[]){
 		hex2bytes(offset, 2, argv[6], 1);
 
 		dsi_brute_emmc_cid(console_id, emmc_cid, src, ver, offset);
-	}else{
-		// aes_128_ecb test
-		u8 test_src[16] = {1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8};
-		u8 test_key[16] = {8, 7, 6, 5, 4, 3, 2, 1, 8, 7, 6, 5, 4, 3, 2, 1};
-		u8 out[16];
+	}else if(argc >= 2 && !strcmp(argv[1], "crypto_test")){
+		u8 key[32] = {1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8};
+		u8 src[32] = {8, 7, 6, 5, 4, 3, 2, 1, 1, 2, 3, 4, 5, 6, 7, 8,
+			1, 2, 3, 4, 5, 6, 7, 8, 8, 7, 6, 5, 4, 3, 2, 1};
+		u8 out[32];
 
 		aes_128_ecb_init();
 
-		aes_128_ecb_set_key(test_key);
+		aes_128_ecb_set_key(key);
 
-		aes_128_ecb_crypt(out, test_src);
-		fputs("aes_128_ecb test 0: ", stdout);
-		hexdump(out, 16, 1);
+		aes_128_ecb_crypt(out, src, 16);
+		aes_128_ecb_crypt(out + 16, src + 16, 16);
+		hexdump(out, 32, 1);
 
-		/*
-		aes_128_ecb_set_key(test_key);
-		// so as expected this is reusable
-		aes_128_ecb_crypt(out, test_key);
-		fputs("aes_128_ecb test 1: ", stdout);
-		hexdump(out, 16, 1);
-		*/
+		aes_128_ecb_crypt(out, src, 32);
+		hexdump(out, 32, 1);
+	}else{
+		puts("invalid parameters");
 	}
+	return 0;
 }

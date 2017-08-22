@@ -6,7 +6,6 @@
 #include <openssl/crypto.h>
 
 #include "crypto.h"
-#include "utils.h"
 
 void sha1(u8 *out, const u8 *in, unsigned len){
 	SHA1(in, len, out);
@@ -51,9 +50,9 @@ void aes_128_ecb_set_key(const u8 *key){
 	}
 }
 
-void aes_128_ecb_crypt(u8 *out, const u8 *in){
+void aes_128_ecb_crypt(u8 *out, const u8 *in, unsigned len){
 	int len_out;
-	if(EVP_EncryptUpdate(&ctx, out, &len_out, in, 16) != 1){
+	if(EVP_EncryptUpdate(&ctx, out, &len_out, in, len) != 1){
 		fprintf(stderr, "%s: EVP_EncryptUpdate() failed\n", __FUNCTION__);
 		exit(-1);
 	}

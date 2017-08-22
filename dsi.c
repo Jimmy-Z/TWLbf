@@ -141,7 +141,7 @@ void dsi_aes_ctr_crypt_block(const u8 *console_id, const u8 *emmc_cid, const u8 
 	aes_128_ecb_set_key(key_reversed);
 
 	u8 xor_stream[16], xor_stream_reversed[16];
-	aes_128_ecb_crypt(xor_stream, ctr);
+	aes_128_ecb_crypt(xor_stream, ctr, 16);
 	byte_reverse_16(xor_stream_reversed, xor_stream);
 
 	u8 out[16];
@@ -191,7 +191,7 @@ void dsi_brute_emmc_cid(const u8 *console_id, const u8 *emmc_cid_template, const
 		byte_reverse_16(ctr, emmc_cid_sha1);
 
 		u8 xor[16];
-		aes_128_ecb_crypt(xor, ctr);
+		aes_128_ecb_crypt(xor, ctr, 16);
 
 		if(!memcmp(target_xor_reversed, xor, 16)){
 			fputs("got a hit: ", stdout);

@@ -44,8 +44,8 @@ void hexdump(const void *b, unsigned l, int space){
 		printf("%02x", *p);
 		++p;
 		if(space && i < l - 1){
-			printf(" ");
+			putchar(' ');
 		}
 	}
-	printf("\n");
+	putchar('\n');
 }
