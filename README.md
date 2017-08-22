@@ -17,7 +17,7 @@ I suggest you get it from [here](https://indy.fulgan.com/SSL/).
 
 	`twlbf crypt [Console ID] [EMMC CID] [src] [offset]`
 
-	- Console ID, 8 bytes, hex string, should be 16 characters long.
+	- Console ID, 8 bytes, hex string, so 16 digits long.
 	- EMMC CID, 16 bytes, hex string.
 	- src, 16 bytes, hex string.
 	- offset, 2 bytes, hex string, beware this is block offset.
@@ -41,16 +41,46 @@ I suggest you get it from [here](https://indy.fulgan.com/SSL/).
 
 	- verify, 16 bytes, hex string.
 
-	when bruting EMMC CID, the EMMC CID you provided was used as a template.
-
-	when bruting Console ID, the Console ID you provided was used as a template.
-
-	the [_bcd variant loops through 0\~9 instead of 0\~0xf](http://problemkaputt.de/gbatek.htm#dsiconsoleids).
-
 	usually you should read 16 bytes from EMMC dump at offset 0x1f0 as [src],
 	use `000000000000000000000000000055aa` as [verify], and `001f` as [offset].
 
-### some notes
+#### when brute force EMMC CID, the EMMC CID you provided was used as a template.
+
+quote from GBATEK:
+
+> eMMC CID Register
+> The CID can be read via SD/MMC commands, and it's also stored at 2FFD7BCh in RAM; the RAM value is little-endian 120bit (ie. without the CRC7 byte), zeropadded to 16-bytes (with 00h in MSB); the value looks as so;
+
+````
+MY ss ss ss ss 03 4D 30 30 46 50 41 00 00 15 00  ;DSi CID KMAPF0000M-S998
+MY ss ss ss ss 32 57 37 31 36 35 4D 00 01 15 00  ;DSi CID KLM5617EFW-B301
+MY ss ss ss ss 03 47 31 30 43 4D 4D 00 01 11 00  ;3DS CID
+````
+
+> The value is used to initialize AES_IV register for eMMC encryption/decryption.
+> The "MY" byte contains month/year; with Y=0Bh..0Dh for 2008..2010 (Y=0Eh..0Fh would be 2011..2012, but there aren't any known DSi/3DS consoles using that values) (unknown how 2013 and up would be assigned; JEDEC didn't seem to mind to define them yet). The "ss" digits are a 32bit serial number (or actually it looks more like a 32bit random number, not like a incrementing serial value).
+
+TWLbr will brute the 4 random bytes(8 "ss" digits).
+
+#### when bruting Console ID, the Console ID you provided was used as a template.
+
+again quoting from GBATEK:
+
+````
+08A20nnnnnnnn1nnh  for DSi
+08A19???????????h  for some other DSi
+08A15???????????h  for some other DSi
+08201nnnnnnnn1nnh  for DSi XL
+6B27D20002000000h  for n3DS
+````
+> The "n" digits appear to be always in BCD range (0..9), the other digits appear to be fixed (on all known consoles; ie. on three DSi's and two DSi XL's and null 3DS's).
+
+The _bcd variant brute the ten BCD digits while the other one brute the lower 4 bytes(later 8 digits).
+
+### Notes
+The program runs only one thread, to saturate multi-core processors,
+you should start multiple instance on different templates.
+
 OpenSSL and mbed TLS can both benefit from AES-NI,
 particularly OpenSSL AES can be 5 times faster with that.
 
