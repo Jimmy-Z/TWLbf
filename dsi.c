@@ -16,6 +16,58 @@ const u32 DSi_KEY_Y[4] =
 const u32 DSi_KEY_MAGIC[4] =
 	{0x1a4f3e79, 0x2a680f5f, 0x29590258, 0xfffefb4e};
 
+static inline u64 u64be(const u8 *in){
+	u64 out;
+	u8 *out8 = (u8*)&out;
+	out8[0] = in[7];
+	out8[1] = in[6];
+	out8[2] = in[5];
+	out8[3] = in[4];
+	out8[4] = in[3];
+	out8[5] = in[2];
+	out8[6] = in[1];
+	out8[7] = in[0];
+	return out;
+}
+
+static inline u32 u32be(const u8 *in){
+	u32 out;
+	u8 *out8 = (u8*)&out;
+	out8[0] = in[3];
+	out8[1] = in[2];
+	out8[2] = in[1];
+	out8[3] = in[0];
+	return out;
+}
+
+static inline u16 u16be(const u8 *in){
+	u16 out;
+	u8 *out8 = (u8*)&out;
+	out8[0] = in[1];
+	out8[1] = in[0];
+	return out;
+}
+
+// CAUTION this one doesn't work in-place
+static inline void byte_reverse_16(u8 *out, const u8 *in){
+	out[0] = in[15];
+	out[1] = in[14];
+	out[2] = in[13];
+	out[3] = in[12];
+	out[4] = in[11];
+	out[5] = in[10];
+	out[6] = in[9];
+	out[7] = in[8];
+	out[8] = in[7];
+	out[9] = in[6];
+	out[10] = in[5];
+	out[11] = in[4];
+	out[12] = in[3];
+	out[13] = in[2];
+	out[14] = in[1];
+	out[15] = in[0];
+}
+
 static inline void xor_128(u64 *x, const u64 *a, const u64 *b){
 	x[0] = a[0] ^ b[0];
 	x[1] = a[1] ^ b[1];
@@ -59,18 +111,18 @@ static inline void dsi_make_key_from_console_id(u64 *key, u64 console_id){
 	dsi_make_key(key, (u64*)key_x);
 }
 
-void dsi_aes_ctr_crypt_block(const u8 *console_id, const u8 *emmc_cid, const u8 *src, u16 offset){
+void dsi_aes_ctr_crypt_block(const u8 *console_id, const u8 *emmc_cid, const u8 *src, const u8 *offset){
 	u64 key[2];
 	dsi_make_key_from_console_id(key, u64be(console_id));
-	printf("AES-CTR KEY: ");
+	fputs("AES-CTR KEY: ", stdout);
 	hexdump(key, 16, 1);
 
 	u8 emmc_cid_sha1[20];
 	sha1(emmc_cid_sha1, emmc_cid, 16);
-	printf("AES-CTR IV:  ");
+	fputs("AES-CTR IV:  ", stdout);
 	hexdump(emmc_cid_sha1, 16, 1);
 
-	printf("Source:      ");
+	fputs("Source:      ", stdout);
 	hexdump(src, 16, 1);
 
 	aes_128_ecb_init();
@@ -80,7 +132,7 @@ void dsi_aes_ctr_crypt_block(const u8 *console_id, const u8 *emmc_cid, const u8 
 	//     first it was (semi) byte reversed to u32[4], to do add with carry, then reverse back
 	// the first reverse in dsi_add_ctr cancelled the reverse in dsi_set_ctx
 	u8 ctr[16];
-	add_128_64((u64*)emmc_cid_sha1, offset);
+	add_128_64((u64*)emmc_cid_sha1, u16be(offset));
 	byte_reverse_16(ctr, emmc_cid_sha1);
 
 	u8 key_reversed[16];
@@ -95,20 +147,20 @@ void dsi_aes_ctr_crypt_block(const u8 *console_id, const u8 *emmc_cid, const u8 
 	u8 out[16];
 	xor_128((u64*)out, (u64*)src, (u64*)xor_stream_reversed);
 
-	printf("Decrypted:   ");
+	fputs("Decrypted:   ", stdout);
 	hexdump(out, 16, 1);
 }
 
-void dsi_brute_emmc_cid(const u8 *console_id, const u8 *emmc_cid_template, const u8 *src, const u8 *ver, u16 offset){
+void dsi_brute_emmc_cid(const u8 *console_id, const u8 *emmc_cid_template, const u8 *src, const u8 *ver, const u8 *offset){
 	u8 emmc_cid[16];
 	memcpy(emmc_cid, emmc_cid_template, sizeof(emmc_cid));
 
 	time_t start = time(0);
 
-	printf("brute EMMC CID from ");
+	fputs("brute EMMC CID from ", stdout);
 	*(u32*)(emmc_cid + 1) = 0;
 	hexdump(emmc_cid, 16, 0);
-	printf("\tto ");
+	fputs("\tto ", stdout);
 	*(u32*)(emmc_cid + 1) = 0xffffffffu;
 	hexdump(emmc_cid, 16, 0);
 
@@ -129,20 +181,20 @@ void dsi_brute_emmc_cid(const u8 *console_id, const u8 *emmc_cid_template, const
 	for (u32 i = 0; i <= 0xffffffffu; ++i){
 		*(u32*)(emmc_cid + 1) = i;
 		if(!(i & 0x00ffffff)){
-			printf("testing ");
+			fputs("testing ", stdout);
 			hexdump(emmc_cid, 16, 0);
 		}
 		u8 emmc_cid_sha1[20];
 		sha1(emmc_cid_sha1, emmc_cid, 16);
 		u8 ctr[16];
-		add_128_64((u64*)emmc_cid_sha1, offset);
+		add_128_64((u64*)emmc_cid_sha1, u16be(offset));
 		byte_reverse_16(ctr, emmc_cid_sha1);
 
 		u8 xor[16];
 		aes_128_ecb_crypt(xor, ctr);
 
 		if(!memcmp(target_xor_reversed, xor, 16)){
-			printf("got a hit: ");
+			fputs("got a hit: ", stdout);
 			hexdump(emmc_cid, 16, 0);
 			break;
 		}

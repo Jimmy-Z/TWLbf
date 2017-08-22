@@ -18,66 +18,14 @@ int htoi(char a){
 	}
 }
 
-u64 u64be(const u8 *in){
-	u64 out;
-	u8 *out8 = (u8*)&out;
-	out8[0] = in[7];
-	out8[1] = in[6];
-	out8[2] = in[5];
-	out8[3] = in[4];
-	out8[4] = in[3];
-	out8[5] = in[2];
-	out8[6] = in[1];
-	out8[7] = in[0];
-	return out;
-}
-
-u32 u32be(const u8 *in){
-	u32 out;
-	u8 *out8 = (u8*)&out;
-	out8[0] = in[3];
-	out8[1] = in[2];
-	out8[2] = in[1];
-	out8[3] = in[0];
-	return out;
-}
-
-u16 u16be(const u8 *in){
-	u16 out;
-	u8 *out8 = (u8*)&out;
-	out8[0] = in[1];
-	out8[1] = in[0];
-	return out;
-}
-
-// CAUTION this one doesn't work in-place
-void byte_reverse_16(u8 *out, const u8 *in){
-	out[0] = in[15];
-	out[1] = in[14];
-	out[2] = in[13];
-	out[3] = in[12];
-	out[4] = in[11];
-	out[5] = in[10];
-	out[6] = in[9];
-	out[7] = in[8];
-	out[8] = in[7];
-	out[9] = in[6];
-	out[10] = in[5];
-	out[11] = in[4];
-	out[12] = in[3];
-	out[13] = in[2];
-	out[14] = in[1];
-	out[15] = in[0];
-}
-
-int hex2bytes(u8 *out, size_t byte_len, const char *in, int critical){
+int hex2bytes(u8 *out, unsigned byte_len, const char *in, int critical){
 	if (strlen(in) != byte_len << 1){
-		fprintf(stderr, "%s: invalid input length, expecting %llu, got %llu.\n",
-			__FUNCTION__, byte_len << 1, strlen(in));
+		fprintf(stderr, "%s: invalid input length, expecting %u, got %u.\n",
+			__FUNCTION__, (unsigned)byte_len << 1, (unsigned)strlen(in));
 		assert(!critical);
 		return -1;
 	}
-	for(size_t i = 0; i < byte_len; ++i){
+	for(unsigned i = 0; i < byte_len; ++i){
 		int h = htoi(*in++), l = htoi(*in++);
 		if(h == -1 || l == -1){
 			fprintf(stderr, "%s: invalid input \"%c%c\"\n",
@@ -90,9 +38,9 @@ int hex2bytes(u8 *out, size_t byte_len, const char *in, int critical){
 	return 0;
 }
 
-void hexdump(const void *b, size_t l, int space){
+void hexdump(const void *b, unsigned l, int space){
 	const u8 *p = (u8*)b;
-	for(size_t i = 0; i < l; ++i){
+	for(unsigned i = 0; i < l; ++i){
 		printf("%02x", *p);
 		++p;
 		if(space && i < l - 1){
