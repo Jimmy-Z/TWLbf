@@ -29,7 +29,9 @@ int main(int argc, const char *argv[]){
 		if(!strcmp(argv[1], "emmc_cid")){
 			dsi_brute_emmc_cid(console_id, emmc_cid, src, ver, offset);
 		}else if(!strcmp(argv[1], "console_id")){
-			dsi_brute_console_id(console_id, emmc_cid, src, ver, offset);
+			dsi_brute_console_id(console_id, emmc_cid, src, ver, offset, 0);
+		}else if(!strcmp(argv[1], "console_id_bcd")){
+			dsi_brute_console_id(console_id, emmc_cid, src, ver, offset, 1);
 		}else{
 			puts("invalid parameters");
 		}

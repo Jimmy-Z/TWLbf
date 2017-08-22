@@ -262,7 +262,7 @@ void dsi_brute_emmc_cid(const u8 *console_id, const u8 *emmc_cid_template,
 }
 
 void dsi_brute_console_id(const u8 *console_id_template, const u8 *emmc_cid,
-	const u8 *src, const u8 *ver, const u8 *offset){
+	const u8 *src, const u8 *ver, const u8 *offset, int bcd){
 	time_t start = time(0);
 
 	crypto_init();
@@ -278,27 +278,71 @@ void dsi_brute_console_id(const u8 *console_id_template, const u8 *emmc_cid,
 	u8 ctr[16];
 	byte_reverse_16(ctr, emmc_cid_sha1);
 
-	u64 console_id = u64be(console_id_template);
+	if(bcd){
+		int succeed = 0;
+		u64 start64 = u64be(console_id_template) & 0xfffff00000000000ull;
+		for (u64 i = 0; (i <= 9ull << 40) && !succeed; i += 1ull << 40) {
+			for (u64 j = 0; (j <= 9ull << 36) && !succeed; j += 1ull << 36) {
+				for (u64 k = 0; (k <= 9ull << 32) && !succeed; k += 1ull << 32) {
+					for (u64 l = 0; (l <= 9ull << 28) && !succeed; l += 1ull << 28) {
+						for (u64 m = 0; (m <= 9ull << 24) && !succeed; m += 1ull << 24) {
+							for (u64 n = 0; (n <= 9ull << 20) && !succeed; n += 1ull << 20) {
+								for (u64 o = 0; (o <= 9ull << 16) && !succeed; o += 1ull << 16) {
+									for (u64 p = 0; (p <= 9ull << 12) && !succeed; p += 1ull << 12) {
+										for (u64 q = 0; (q <= 9ull << 4) && !succeed; q += 1ull << 4) {
+											for (u64 r = 0; (r <= 9ull) && !succeed; r += 1ull) {
+												u64 console_id = start64 + i + j + k + l + m + n + o + p + 0x100 + q + r;
+												if ((console_id & 0xffffffff) == 0x100) {
+													printf("testing %016llx\n", (long long unsigned)console_id);
+												}
 
-	for (u32 i = 0; i <= 0xffffffffu; ++i){
-		// brute through the lower 32 bits
-		*(u32*)&console_id = i;
-		if(!(i << 8)){
-			printf("testing %016llx\n", (long long unsigned)console_id);
+												u64 key[2];
+												dsi_make_key_from_console_id(key, console_id);
+												u8 key_reversed[16];
+												byte_reverse_16(key_reversed, (u8*)key);
+
+												aes_128_ecb_set_key(key_reversed);
+
+												u64 xor[2];
+												aes_128_ecb_crypt_1((u8*)xor, ctr);
+
+												if(xor[0] == target_xor_l64 && xor[1] == target_xor_h64){
+													printf("got a hit: %016llx\n", (long long unsigned)console_id);
+													succeed = 1;
+													break;
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
 		}
-		u64 key[2];
-		dsi_make_key_from_console_id(key, console_id);
-		u8 key_reversed[16];
-		byte_reverse_16(key_reversed, (u8*)key);
+	}else{
+		u64 start64 = u64be(console_id_template) & 0xffffffff00000000ull;
+		for (u64 i = 0; i <= 1ull << 32; ++i){
+			// brute through the lower 32 bits
+			u64 console_id = start64 | i;
+			if(!(i & 0xffffff)){
+				printf("testing %016llx\n", (long long unsigned)console_id);
+			}
+			u64 key[2];
+			dsi_make_key_from_console_id(key, console_id);
+			u8 key_reversed[16];
+			byte_reverse_16(key_reversed, (u8*)key);
 
-		aes_128_ecb_set_key(key_reversed);
+			aes_128_ecb_set_key(key_reversed);
 
-		u64 xor[2];
-		aes_128_ecb_crypt_1((u8*)xor, ctr);
+			u64 xor[2];
+			aes_128_ecb_crypt_1((u8*)xor, ctr);
 
-		if(xor[0] == target_xor_l64 && xor[1] == target_xor_h64){
-			printf("got a hit: %016llx\n", (long long unsigned)console_id);
-			break;
+			if(xor[0] == target_xor_l64 && xor[1] == target_xor_h64){
+				printf("got a hit: %016llx\n", (long long unsigned)console_id);
+				break;
+			}
 		}
 	}
 	printf("%.2f seconds\n", difftime(time(0), start));
