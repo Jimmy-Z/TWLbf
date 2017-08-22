@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
+#include <malloc.h>
 #include "dsi.h"
 #include "utils.h"
 #include "crypto.h"
@@ -151,11 +152,18 @@ void dsi_aes_ctr_crypt_block(const u8 *console_id, const u8 *emmc_cid, const u8 
 	hexdump(out, 16, 1);
 }
 
+#define BLOCK_SIZE 16
+#define CHUNK_BITS 12
+#define CHUNK_LEN (1 << CHUNK_BITS)
+#define CHUNK_COUNT (1 << (32 - CHUNK_BITS))
+
 void dsi_brute_emmc_cid(const u8 *console_id, const u8 *emmc_cid_template, const u8 *src, const u8 *ver, const u8 *offset){
 	u8 emmc_cid[16];
 	memcpy(emmc_cid, emmc_cid_template, sizeof(emmc_cid));
 
 	time_t start = time(0);
+
+	aes_128_ecb_init();
 
 	fputs("brute EMMC CID from ", stdout);
 	*(u32*)(emmc_cid + 1) = 0;
@@ -168,8 +176,7 @@ void dsi_brute_emmc_cid(const u8 *console_id, const u8 *emmc_cid_template, const
    	xor_128((u64*)target_xor, (u64*)src, (u64*)ver);
 	u8 target_xor_reversed[16];
 	byte_reverse_16(target_xor_reversed, target_xor);
-
-	aes_128_ecb_init();
+	// hexdump(target_xor_reversed, 16, 1);
 
 	u64 key[2];
 	dsi_make_key_from_console_id(key, u64be(console_id));
@@ -178,27 +185,44 @@ void dsi_brute_emmc_cid(const u8 *console_id, const u8 *emmc_cid_template, const
 
 	aes_128_ecb_set_key(key_reversed);
 
-	for (u32 i = 0; i <= 0xffffffffu; ++i){
-		*(u32*)(emmc_cid + 1) = i;
-		if(!(i & 0x00ffffff)){
+	u64 offset64 = u16be(offset);
+
+	int succeed = 0;
+	u8 *ctr_chunk = malloc(BLOCK_SIZE * CHUNK_LEN);
+	u8 *xor_chunk = malloc(BLOCK_SIZE * CHUNK_LEN);
+	for (unsigned i = 0; i < CHUNK_COUNT; ++i){
+		if(!(i << (CHUNK_BITS + 8))){
+			*(u32*)(emmc_cid + 1) = i << CHUNK_BITS;
 			fputs("testing ", stdout);
 			hexdump(emmc_cid, 16, 0);
 		}
-		u8 emmc_cid_sha1[20];
-		sha1(emmc_cid_sha1, emmc_cid, 16);
-		u8 ctr[16];
-		add_128_64((u64*)emmc_cid_sha1, u16be(offset));
-		byte_reverse_16(ctr, emmc_cid_sha1);
+		for(unsigned j = 0; j < CHUNK_LEN; ++j){
+			*(u32*)(emmc_cid + 1) = (i << CHUNK_BITS) + j;
+			// printf("0x%08x\n", *(u32*)(emmc_cid + 1));
+			u8 emmc_cid_sha1[20];
+			sha1(emmc_cid_sha1, emmc_cid, 16);
+			add_128_64((u64*)emmc_cid_sha1, offset64);
+			byte_reverse_16(ctr_chunk + BLOCK_SIZE * j, emmc_cid_sha1);
+		}
 
-		u8 xor[16];
-		aes_128_ecb_crypt(xor, ctr, 16);
+		aes_128_ecb_crypt(xor_chunk, ctr_chunk, BLOCK_SIZE * CHUNK_LEN);
 
-		if(!memcmp(target_xor_reversed, xor, 16)){
-			fputs("got a hit: ", stdout);
-			hexdump(emmc_cid, 16, 0);
+		for(unsigned j = 0; j < CHUNK_LEN; ++j){
+			// hexdump(xor_chunk + BLOCK_SIZE * j, 16, 1);
+			if(!memcmp(target_xor_reversed, xor_chunk + BLOCK_SIZE * j, 16)){
+				fputs("got a hit: ", stdout);
+				*(u32*)(emmc_cid + 1) = (i << CHUNK_BITS) + j;
+				hexdump(emmc_cid, 16, 0);
+				succeed = 1;
+				break;
+			}
+		}
+		if(succeed){
 			break;
 		}
 	}
+	free(ctr_chunk);
+	free(xor_chunk);
 	printf("%.2f seconds\n", difftime(time(0), start));
 }
 

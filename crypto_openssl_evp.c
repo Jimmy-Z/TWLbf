@@ -56,8 +56,12 @@ void aes_128_ecb_crypt(u8 *out, const u8 *in, unsigned len){
 		fprintf(stderr, "%s: EVP_EncryptUpdate() failed\n", __FUNCTION__);
 		exit(-1);
 	}
-	if(EVP_EncryptFinal_ex(&ctx, out + len_out, &len_out) != 1){
-		fprintf(stderr, "%s: EVP_EncryptFinal_ex() failed\n", __FUNCTION__);
-		exit(-1);
+	if(len_out < len){
+		printf ("%s: 0x%08x\n", __FUNCTION__, len_out);
+		if(EVP_EncryptFinal_ex(&ctx, out + len_out, &len_out) != 1){
+			fprintf(stderr, "%s: EVP_EncryptFinal_ex() failed\n", __FUNCTION__);
+			exit(-1);
+		}
+		printf ("%s: 0x%08x\n", __FUNCTION__, len_out);
 	}
 }
