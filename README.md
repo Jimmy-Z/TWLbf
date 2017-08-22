@@ -26,11 +26,17 @@ DSi Console ID or EMMC CID brute-force
 
 	`twlbf console_id [Console ID] [EMMC CID] [src] [verify] [offset]`
 
+	`twlbf console_id_bcd [Console ID] [EMMC CID] [src] [verify] [offset]`
+
 	- verify, 16 bytes, hex string.
 
-	when brute EMMC CID, the EMMC CID you provided was used as a template.
+	when bruting EMMC CID, the EMMC CID you provided was used as a template.
+	the OpenSSL build is faster for this.
 
-	when brute Console ID, the Console ID you provided was used as a template.
+	when bruting Console ID, the Console ID you provided was used as a template.
+	the mbed TLS build is faster for this.
+
+	the _bcd variant loops through 0~9 instead of 0~0xf.
 
 	usually you should read 16 bytes from EMMC dump at offset 0x1f0 as [src],
 	use `000000000000000000000000000055aa` as [verify], and `001f` as [offset].
