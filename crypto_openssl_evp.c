@@ -1,15 +1,12 @@
 
 #include <stdio.h>
+#include <assert.h>
 #include <openssl/sha.h>
 #include <openssl/evp.h>
 #include <openssl/opensslv.h>
 #include <openssl/crypto.h>
 
 #include "crypto.h"
-
-void sha1(u8 *out, const u8 *in, unsigned len){
-	SHA1(in, len, out);
-}
 
 static EVP_CIPHER_CTX ctx;
 
@@ -30,7 +27,7 @@ static void print_openssl_version(unsigned ver){
 	}
 }
 
-void aes_128_ecb_init(){
+void crypto_init(){
 	// look  like they're struggling with the names
 	// https://github.com/openssl/openssl/blob/OpenSSL_1_0_2-stable/apps/version.c#L175-L182
 	fputs(SSLeay_version(SSLEAY_VERSION), stdout);
@@ -43,25 +40,22 @@ void aes_128_ecb_init(){
 	EVP_CIPHER_CTX_init(&ctx);
 }
 
+void sha1(u8 *out, const u8 *in, unsigned len){
+	SHA1(in, len, out);
+}
+
 void aes_128_ecb_set_key(const u8 *key){
-	if(EVP_EncryptInit_ex(&ctx, EVP_aes_128_ecb(), NULL, key, NULL) != 1){
-		fprintf(stderr, "%s: EVP_EncryptInit_ex() failed\n", __FUNCTION__);
-		exit(-1);
-	}
+	assert(EVP_EncryptInit_ex(&ctx, EVP_aes_128_ecb(), NULL, key, NULL) == 1);
+}
+
+void aes_128_ecb_crypt_1(u8 *out, const u8 *in){
+	int len_out;
+	assert(EVP_EncryptUpdate(&ctx, out, &len_out, in, 16) == 1);
+	assert(len_out == 16);
 }
 
 void aes_128_ecb_crypt(u8 *out, const u8 *in, unsigned len){
 	int len_out;
-	if(EVP_EncryptUpdate(&ctx, out, &len_out, in, len) != 1){
-		fprintf(stderr, "%s: EVP_EncryptUpdate() failed\n", __FUNCTION__);
-		exit(-1);
-	}
-	if(len_out < len){
-		printf ("%s: 0x%08x\n", __FUNCTION__, len_out);
-		if(EVP_EncryptFinal_ex(&ctx, out + len_out, &len_out) != 1){
-			fprintf(stderr, "%s: EVP_EncryptFinal_ex() failed\n", __FUNCTION__);
-			exit(-1);
-		}
-		printf ("%s: 0x%08x\n", __FUNCTION__, len_out);
-	}
+	assert(EVP_EncryptUpdate(&ctx, out, &len_out, in, len) == 1);
+	assert(len_out == len);
 }

@@ -121,6 +121,7 @@ static inline void dsi_make_key_from_console_id(u64 *key, u64 console_id){
 }
 
 void dsi_aes_ctr_crypt_block(const u8 *console_id, const u8 *emmc_cid, const u8 *src, const u8 *offset){
+	crypto_init();
 	u64 key[2];
 	dsi_make_key_from_console_id(key, u64be(console_id));
 	fputs("AES-CTR KEY: ", stdout);
@@ -134,14 +135,13 @@ void dsi_aes_ctr_crypt_block(const u8 *console_id, const u8 *emmc_cid, const u8 
 	fputs("Source:      ", stdout);
 	hexdump(src, 16, 1);
 
-	aes_128_ecb_init();
 	// twltool/dsi.c
 	// in dsi_set_ctx, ctx/iv is reversed
 	// then dsi_add_ctr is a big endian add
 	//     first it was (semi) byte reversed to u32[4], to do add with carry, then reverse back
 	// the first reverse in dsi_add_ctr cancelled the reverse in dsi_set_ctx
-	u8 ctr[16];
 	add_128_64((u64*)emmc_cid_sha1, u16be(offset));
+	u8 ctr[16];
 	byte_reverse_16(ctr, emmc_cid_sha1);
 
 	u8 key_reversed[16];
@@ -150,7 +150,7 @@ void dsi_aes_ctr_crypt_block(const u8 *console_id, const u8 *emmc_cid, const u8 
 	aes_128_ecb_set_key(key_reversed);
 
 	u8 xor_stream[16], xor_stream_reversed[16];
-	aes_128_ecb_crypt(xor_stream, ctr, 16);
+	aes_128_ecb_crypt_1(xor_stream, ctr);
 	byte_reverse_16(xor_stream_reversed, xor_stream);
 
 	u8 out[16];
@@ -175,7 +175,7 @@ void dsi_brute_emmc_cid(const u8 *console_id, const u8 *emmc_cid_template, const
 
 	time_t start = time(0);
 
-	aes_128_ecb_init();
+	crypto_init();
 
 	fputs("brute EMMC CID from ", stdout);
 	*(u32*)(emmc_cid + 1) = 0;
@@ -259,3 +259,44 @@ void dsi_brute_emmc_cid(const u8 *console_id, const u8 *emmc_cid_template, const
 	printf("%.2f seconds\n", difftime(time(0), start));
 }
 
+void dsi_brute_console_id(const u8 *console_id_template, const u8 *emmc_cid, const u8 *src, const u8 *ver, const u8 *offset){
+	time_t start = time(0);
+
+	crypto_init();
+
+	u8 target_xor[16];
+	xor_128((u64*)target_xor, (u64*)src, (u64*)ver);
+	u64 target_xor_l64 = u64be(target_xor + 8);
+	u64 target_xor_h64 = u64be(target_xor);
+
+	u8 emmc_cid_sha1[20];
+	sha1(emmc_cid_sha1, emmc_cid, 16);
+	add_128_64((u64*)emmc_cid_sha1, u16be(offset));
+	u8 ctr[16];
+	byte_reverse_16(ctr, emmc_cid_sha1);
+
+	u64 console_id = u64be(console_id_template);
+
+	for (u32 i = 0; i <= 0xffffffffu; ++i){
+		// brute through the lower 32 bits
+		*(u32*)console_id = i;
+		if(!(i << 24)){
+			printf("testing %016llx\n", console_id);
+		}
+		u64 key[2];
+		dsi_make_key_from_console_id(key, console_id);
+		u8 key_reversed[16];
+		byte_reverse_16(key_reversed, (u8*)key);
+
+		aes_128_ecb_set_key(key_reversed);
+
+		u64 xor[2];
+		aes_128_ecb_crypt_1((u8*)xor, ctr);
+
+		if(xor[0] == target_xor_l64 && xor[1] == target_xor_h64){
+			printf("got a hit: %016llx\n", console_id);
+			break;
+		}
+	}
+	printf("%.2f seconds\n", difftime(time(0), start));
+}
