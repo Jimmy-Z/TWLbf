@@ -38,14 +38,21 @@ int hex2bytes(u8 *out, unsigned byte_len, const char *in, int critical){
 	return 0;
 }
 
-void hexdump(const void *b, unsigned l, int space){
+#ifndef HEXDUMP_BUF_SIZE
+#define HEXDUMP_BUF_SIZE 0x100
+#endif
+
+static char hexdump_buf[HEXDUMP_BUF_SIZE];
+// CAUTION, this always assume you have a buffer big enough
+const char *hexdump(const void *b, unsigned l, int space){
 	const u8 *p = (u8*)b;
+	char *out = hexdump_buf;
 	for(unsigned i = 0; i < l; ++i){
-		printf("%02x", *p);
+		out += sprintf(out, "%02x", *p);
 		++p;
 		if(space && i < l - 1){
-			putchar(' ');
+			*out++ = ' ';
 		}
 	}
-	putchar('\n');
+	return hexdump_buf;
 }

@@ -18,7 +18,7 @@ int main(int argc, const char *argv[]){
 
 		dsi_aes_ctr_crypt_block(console_id, emmc_cid, src, offset);
 	}else if(argc == 7){
-		// twlbf emmc_cid/console_id [Console ID] [EMMC CID] [src] [verify] [offset]
+		// twlbf emmc_cid/console_id(_bcd) [Console ID] [EMMC CID] [src] [verify] [offset]
 		u8 console_id[8], emmc_cid[16], src[16], ver[16], offset[2];
 		hex2bytes(console_id, 8, argv[2], 1);
 		hex2bytes(emmc_cid, 16, argv[3], 1);
@@ -47,10 +47,10 @@ int main(int argc, const char *argv[]){
 
 		aes_128_ecb_crypt(out, src, 16);
 		aes_128_ecb_crypt(out + 16, src + 16, 16);
-		hexdump(out, 32, 1);
+		puts(hexdump(out, 32, 1));
 
 		aes_128_ecb_crypt(out, src, 32);
-		hexdump(out, 32, 1);
+		puts(hexdump(out, 32, 1));
 	}else{
 		puts("invalid parameters");
 	}

@@ -1,8 +1,9 @@
 # TWLbf
-DSi Console ID or EMMC CID brute-force
+DSi Console ID or EMMC CID brute-force.
+discussion thread on [GBAtemp.net](https://gbatemp.net/threads/481732/)
 
 ### Download
-Build on Linux requires OpenSSL headers.
+Build requires OpenSSL headers.
 
 There're two build targets one of them linked with OpenSSL
 and the other linked with mbed TLS.
@@ -60,7 +61,7 @@ MY ss ss ss ss 03 47 31 30 43 4D 4D 00 01 11 00  ;3DS CID
 > The value is used to initialize AES_IV register for eMMC encryption/decryption.
 > The "MY" byte contains month/year; with Y=0Bh..0Dh for 2008..2010 (Y=0Eh..0Fh would be 2011..2012, but there aren't any known DSi/3DS consoles using that values) (unknown how 2013 and up would be assigned; JEDEC didn't seem to mind to define them yet). The "ss" digits are a 32bit serial number (or actually it looks more like a 32bit random number, not like a incrementing serial value).
 
-TWLbr will brute the 4 random bytes(8 "ss" digits).
+TWLbf will brute the 4 random bytes(8 "ss" digits).
 
 #### when bruting Console ID, the Console ID you provided was used as a template.
 
@@ -80,6 +81,7 @@ The _bcd variant brute the ten BCD digits while the other one brute the lower 4 
 ### Notes
 The program runs only one thread, to saturate multi-core processors,
 you should start multiple instance on different templates.
+more about this on the GBAtemp thread.
 
 OpenSSL and mbed TLS can both benefit from AES-NI,
 particularly OpenSSL AES can be 5 times faster with that.
