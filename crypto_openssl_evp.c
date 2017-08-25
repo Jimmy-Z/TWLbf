@@ -1,7 +1,7 @@
 
 #include <stdio.h>
 #include <assert.h>
-#include <openssl/sha.h>
+// #include <openssl/sha.h>
 #include <openssl/evp.h>
 #include <openssl/opensslv.h>
 #include <openssl/crypto.h>
@@ -40,9 +40,11 @@ void crypto_init(){
 	EVP_CIPHER_CTX_init(&ctx);
 }
 
+/*
 void sha1(u8 *out, const u8 *in, unsigned len){
 	SHA1(in, len, out);
 }
+*/
 
 void aes_128_ecb_set_key(const u8 *key){
 	assert(EVP_EncryptInit_ex(&ctx, EVP_aes_128_ecb(), NULL, key, NULL) == 1);

@@ -36,7 +36,7 @@ int main(int argc, const char *argv[]){
 			puts("invalid parameters");
 		}
 	}else if(argc >= 2 && !strcmp(argv[1], "crypto_test")){
-		u8 key[32] = {1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8};
+		u8 key[16] = {1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8};
 		u8 src[32] = {8, 7, 6, 5, 4, 3, 2, 1, 1, 2, 3, 4, 5, 6, 7, 8,
 			1, 2, 3, 4, 5, 6, 7, 8, 8, 7, 6, 5, 4, 3, 2, 1};
 		u8 out[32];

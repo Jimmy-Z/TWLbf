@@ -1,6 +1,7 @@
+
 #include <stdint.h>
 
-/* SHA1 code dug out from mbed TLS
+/* SHA1 code dug out from mbed TLS 2.5.1
  * the sha1_16 only supports 16 bytes input and only spit out the first 16 bytes
  */
 

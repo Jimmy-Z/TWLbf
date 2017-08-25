@@ -81,6 +81,13 @@ we're forced to do lots of 16 byte AES operations,
 this time mbed TLS shines for having a very light interface.
 overall it is about 2.5x faster than OpenSSL build.
 
+### License:
+Usually my code is licensed under [WTFPL](https://en.wikipedia.org/wiki/WTFPL),
+but this project used code from mbed TLS which is Apache 2.0 license,
+so I guess this project becomes Apache 2.0 licensed automatically?
+or only the `crypto.c` file is Apache 2.0?
+I'm not sure.
+
 ### Thanks:
 - Martin Korth for [GBATEK](http://problemkaputt.de/gbatek.htm)
 - Wulfystylez/WinterMute for [TWLTool](https://github.com/WinterMute/twltool)
