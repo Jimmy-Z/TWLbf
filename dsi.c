@@ -20,11 +20,11 @@ long long time_diff(const struct timeval *t1, const struct timeval *t0){
 // http://problemkaputt.de/gbatek.htm
 // https://github.com/WinterMute/twltool
 
-const u32 DSi_KEY_Y[4] =
-	{0x0ab9dc76, 0xbd4dc4d3, 0x202ddd1d, 0xe1a00005};
+const u64 DSi_KEY_Y[2] =
+	{0xbd4dc4d30ab9dc76ull, 0xe1a00005202ddd1dull};
 
-const u32 DSi_KEY_MAGIC[4] =
-	{0x1a4f3e79, 0x2a680f5f, 0x29590258, 0xfffefb4e};
+const u64 DSi_KEY_MAGIC[2] =
+	{0x2a680f5f1a4f3e79ull, 0xfffefb4e29590258ull};
 
 static inline u64 u64be(const u8 *in){
 	u64 out;
@@ -112,8 +112,8 @@ static inline void dsi_make_key(u64 *key, u64 console_id){
 	u32 key_x[4] = {l, l ^ 0x24ee6906, h ^ 0xe65b601d, h};
 	// Key = ((Key_X XOR Key_Y) + FFFEFB4E295902582A680F5F1A4F3E79h) ROL 42
 	// equivalent to F_XY in twltool/f_xy.c
-	xor_128(key, (u64*)key_x, (u64*)DSi_KEY_Y);
-	add_128(key, (u64*)DSi_KEY_MAGIC);
+	xor_128(key, (u64*)key_x, DSi_KEY_Y);
+	add_128(key, DSi_KEY_MAGIC);
 	rol42_128(key);
 }
 
@@ -125,7 +125,7 @@ void dsi_aes_ctr_crypt_block(const u8 *console_id, const u8 *emmc_cid,
 	printf("AES-CTR KEY: %s\n", hexdump(key, 16, 1));
 
 	u8 emmc_cid_sha1[20];
-	sha1(emmc_cid_sha1, emmc_cid, 16);
+	sha1_16(emmc_cid_sha1, emmc_cid);
 	printf("AES-CTR IV:  %s\n", hexdump(emmc_cid_sha1, 16, 1));
 
 	printf("Source:      %s\n", hexdump(src, 16, 1));
@@ -213,7 +213,7 @@ void dsi_brute_emmc_cid(const u8 *console_id, const u8 *emmc_cid_template,
 #endif
 		for(unsigned j = 0; j < CHUNK_LEN; ++j){
 			u8 emmc_cid_sha1[20];
-			sha1(emmc_cid_sha1, emmc_cid, 16);
+			sha1_16(emmc_cid_sha1, emmc_cid);
 			add_128_64((u64*)emmc_cid_sha1, offset64);
 			byte_reverse_16(ctr_chunk + BLOCK_SIZE * j, emmc_cid_sha1);
 			*(u32*)(emmc_cid + 1) += 1;
@@ -263,7 +263,7 @@ void dsi_brute_console_id(const u8 *console_id_template, const u8 *emmc_cid,
 	u64 target_xor_h64 = u64be(target_xor);
 
 	u8 emmc_cid_sha1[20];
-	sha1(emmc_cid_sha1, emmc_cid, 16);
+	sha1_16(emmc_cid_sha1, emmc_cid);
 	add_128_64((u64*)emmc_cid_sha1, u16be(offset));
 	u8 ctr[16];
 	byte_reverse_16(ctr, emmc_cid_sha1);

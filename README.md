@@ -14,36 +14,22 @@ The Windows version linked with OpenSSL requires libeay32.dll to run,
 I suggest you get it from [here](https://indy.fulgan.com/SSL/).
 
 ### Usage
-- (de/en)crypt a single block(as in AES block, not NAND block):
+brute force by providing a known block(as in AES block, not NAND block) to verify against:
 
-	`twlbf crypt [Console ID] [EMMC CID] [src] [offset]`
+````
+twlbf emmc_cid [Console ID] [EMMC CID] [src] [verify] [offset]
+twlbf console_id [Console ID] [EMMC CID] [src] [verify] [offset]
+twlbf console_id_bcd [Console ID] [EMMC CID] [src] [verify] [offset]
+````
 
-	- Console ID, 8 bytes, hex string, so 16 digits long.
-	- EMMC CID, 16 bytes, hex string.
-	- src, 16 bytes, hex string.
-	- offset, 2 bytes, hex string, beware this is block offset.
+- Console ID, 8 bytes, hex string, so 16 digits long.
+- EMMC CID, 16 bytes, hex string.
+- src, 16 bytes, hex string.
+- verify, 16 bytes, hex string.
+- offset, 2 bytes, hex string, beware this is block offset.
 
-	AES-CTR is symmetric so encrypt and decrypt is the same thing.
-
-	example: decrypt a block at 0x1f0(in byte offset):
-	````
-	twlbf crypt 08a1522617110121 ab6778e02d034d303046504100001500 \
-		1ced45c75e810bb6b51a5318e0fc5eee 001f
-	````
-	the result should be `000000000000000000000000000055aa`
-
-- brute force by providing a known block to verify against:
-
-	`twlbf emmc_cid [Console ID] [EMMC CID] [src] [verify] [offset]`
-
-	`twlbf console_id [Console ID] [EMMC CID] [src] [verify] [offset]`
-
-	`twlbf console_id_bcd [Console ID] [EMMC CID] [src] [verify] [offset]`
-
-	- verify, 16 bytes, hex string.
-
-	usually you should read 16 bytes from EMMC dump at offset 0x1f0 as [src],
-	use `000000000000000000000000000055aa` as [verify], and `001f` as [offset].
+usually you should read 16 bytes from EMMC dump at offset 0x1f0 as [src],
+use `000000000000000000000000000055aa` as [verify], and `001f` as [offset].
 
 #### when brute force EMMC CID, the EMMC CID you provided was used as a template.
 
@@ -88,8 +74,7 @@ particularly OpenSSL AES can be 5 times faster with that.
 
 EMMC CID brute forcing can be optimized to do AES on large blocks,
 for that kind of work OpenSSL's AES-NI implementation is about 1.8x faster than mbed TLS,
-overall speed improvement is about 1.4x due to SHA1 costing most of the CPU time.
-OpenSSL SHA1 is also a bit faster than mbed TLS.
+overall speed improvement is not that impressive due to SHA1 costing most of the CPU time.
 
 Console ID brute forcing unfortunately can't be optimized that way,
 we're forced to do lots of 16 byte AES operations,
