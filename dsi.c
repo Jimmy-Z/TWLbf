@@ -118,17 +118,16 @@ static inline void dsi_make_key(u64 *key, u64 console_id){
 }
 
 void dsi_aes_ctr_crypt_block(const u8 *console_id, const u8 *emmc_cid,
-	const u8 *src, const u8 *offset){
+	const u8 *offset, const u8 *src){
 	crypto_init();
 	u64 key[2];
 	dsi_make_key(key, u64be(console_id));
-	printf("AES-CTR KEY: %s\n", hexdump(key, 16, 1));
+	u8 key_reversed[16];
+	byte_reverse_16(key_reversed, (u8*)key);
+	printf("AES-CTR KEY: %s\n", hexdump(key_reversed, 16, 1));
 
 	u8 emmc_cid_sha1[20];
 	sha1_16(emmc_cid_sha1, emmc_cid);
-	printf("AES-CTR IV:  %s\n", hexdump(emmc_cid_sha1, 16, 1));
-
-	printf("Source:      %s\n", hexdump(src, 16, 1));
 
 	// twltool/dsi.c
 	// in dsi_set_ctx, ctx/iv is reversed
@@ -138,15 +137,15 @@ void dsi_aes_ctr_crypt_block(const u8 *console_id, const u8 *emmc_cid,
 	add_128_64((u64*)emmc_cid_sha1, u16be(offset));
 	u8 ctr[16];
 	byte_reverse_16(ctr, emmc_cid_sha1);
-
-	u8 key_reversed[16];
-	byte_reverse_16(key_reversed, (u8*)key);
+	printf("AES-CTR IV:  %s\n", hexdump(ctr, 16, 1));
 
 	aes_128_ecb_set_key(key_reversed);
 
 	u8 xor_stream[16], xor_stream_reversed[16];
 	aes_128_ecb_crypt_1(xor_stream, ctr);
 	byte_reverse_16(xor_stream_reversed, xor_stream);
+
+	printf("Source:      %s\n", hexdump(src, 16, 1));
 
 	u8 out[16];
 	xor_128((u64*)out, (u64*)src, (u64*)xor_stream_reversed);
@@ -164,11 +163,12 @@ void dsi_aes_ctr_crypt_block(const u8 *console_id, const u8 *emmc_cid,
 #define CHUNK_COUNT (1 << (32 - CHUNK_BITS))
 
 void dsi_brute_emmc_cid(const u8 *console_id, const u8 *emmc_cid_template,
-	const u8 *src, const u8 *ver, const u8 *offset){
+	const u8 *offset, const u8 *src, const u8 *ver){
 	u8 emmc_cid[16];
 	memcpy(emmc_cid, emmc_cid_template, sizeof(emmc_cid));
 
 	time_t start = time(0);
+	u64 tested = 0;
 
 	crypto_init();
 
@@ -225,6 +225,7 @@ void dsi_brute_emmc_cid(const u8 *console_id, const u8 *emmc_cid_template,
 #if DSI_PROFILE
 		gettimeofday(&t2, NULL);
 #endif
+		tested = i * CHUNK_LEN;
 		u64 *p_l = (u64*)xor_chunk, *p_h = (u64*)(xor_chunk + 8);
 		for(unsigned j = 0; j < CHUNK_LEN; ++j){
 			if(*p_l == target_xor_l64 && *p_h == target_xor_h64){
@@ -248,11 +249,14 @@ void dsi_brute_emmc_cid(const u8 *console_id, const u8 *emmc_cid_template,
 	}
 	free(ctr_chunk);
 	free(xor_chunk);
-	printf("%.2f seconds\n", difftime(time(0), start));
+	double td = difftime(time(0), start);
+	printf("%.2f seconds, %.2f M/s\n", td, tested / 1000000.0 / td);
 }
 
 void dsi_brute_console_id(const u8 *console_id_template, const u8 *emmc_cid,
-	const u8 *src, const u8 *ver, const u8 *offset, int bcd){
+	const u8 *offset, const u8 *src, const u8 *ver, int bcd)
+{
+	u64 tested = 0;
 	time_t start = time(0);
 
 	crypto_init();
@@ -294,6 +298,8 @@ void dsi_brute_console_id(const u8 *console_id_template, const u8 *emmc_cid,
 												u64 xor[2];
 												aes_128_ecb_crypt_1((u8*)xor, ctr);
 
+												++tested;
+
 												if(xor[0] == target_xor_l64 && xor[1] == target_xor_h64){
 													printf("got a hit: %08x%08x\n", (u32)(console_id >> 32), (u32)console_id);
 													succeed = 1;
@@ -312,6 +318,7 @@ void dsi_brute_console_id(const u8 *console_id_template, const u8 *emmc_cid,
 	}else{
 		u64 start64 = u64be(console_id_template) & 0xffffffff00000000ull;
 		for (u64 i = 0; i <= 1ull << 32; ++i){
+			tested = i;
 			// brute through the lower 32 bits
 			u64 console_id = start64 | i;
 			if(!(i & 0xfffffff)){
@@ -333,5 +340,6 @@ void dsi_brute_console_id(const u8 *console_id_template, const u8 *emmc_cid,
 			}
 		}
 	}
-	printf("%.2f seconds\n", difftime(time(0), start));
+	double td = difftime(time(0), start);
+	printf("%.2f seconds, %.2f M/s\n", td, tested / 1000000.0 / td);
 }
