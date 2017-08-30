@@ -85,7 +85,7 @@ overall it is about 2.5x faster than OpenSSL build.
 Usually my code is licensed under [WTFPL](https://en.wikipedia.org/wiki/WTFPL),
 but this project used code from mbed TLS which is Apache 2.0 license,
 so I guess this project becomes Apache 2.0 licensed automatically?
-or only the `crypto.c` file is Apache 2.0?
+or only the `sha1_16.c` file is Apache 2.0?
 I'm not sure.
 
 ### Thanks:
