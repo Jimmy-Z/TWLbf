@@ -54,5 +54,8 @@ int main(int argc, const char *argv[]){
 	}else{
 		puts("invalid parameters");
 	}
+#ifdef _WIN32
+	system("pause");
+#endif
 	return 0;
 }
