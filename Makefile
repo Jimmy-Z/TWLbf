@@ -13,3 +13,4 @@ $(PNAME)_mbedtls: $(OBJS) $(MBEDTLS_OBJS) crypto_mbedtls.o
 
 clean:
 	rm $(PNAME)_* *.o
+

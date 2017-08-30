@@ -343,3 +343,4 @@ void dsi_brute_console_id(const u8 *console_id_template, const u8 *emmc_cid,
 	double td = difftime(time(0), start);
 	printf("%.2f seconds, %.2f M/s\n", td, tested / 1000000.0 / td);
 }
+

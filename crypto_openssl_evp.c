@@ -61,3 +61,4 @@ void aes_128_ecb_crypt(u8 *out, const u8 *in, unsigned len){
 	assert(EVP_EncryptUpdate(&ctx, out, &len_out, in, len) == 1);
 	assert(len_out == len);
 }
+

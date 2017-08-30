@@ -56,3 +56,4 @@ void aes_128_ecb_crypt(u8 *out, const u8 *in, unsigned len){
 		out += 16;
 	}
 }
+
