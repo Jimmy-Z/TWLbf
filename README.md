@@ -17,16 +17,16 @@ I suggest you get it from [here](https://indy.fulgan.com/SSL/).
 brute force by providing a known block(as in AES block, not NAND block) to verify against:
 
 ````
-twlbf emmc_cid [Console ID] [EMMC CID] [src] [verify] [offset]
-twlbf console_id [Console ID] [EMMC CID] [src] [verify] [offset]
-twlbf console_id_bcd [Console ID] [EMMC CID] [src] [verify] [offset]
+twlbf emmc_cid [Console ID] [EMMC CID] [offset] [src] [verify]
+twlbf console_id [Console ID] [EMMC CID] [offset] [src] [verify]
+twlbf console_id_bcd [Console ID] [EMMC CID] [offset] [src] [verify]
 ````
 
 - Console ID, 8 bytes, hex string, so 16 digits long.
 - EMMC CID, 16 bytes, hex string.
+- offset, 2 bytes, hex string, beware this is block offset.
 - src, 16 bytes, hex string.
 - verify, 16 bytes, hex string.
-- offset, 2 bytes, hex string, beware this is block offset.
 
 usually you should read 16 bytes from EMMC dump at offset 0x1f0 as [src],
 use `000000000000000000000000000055aa` as [verify], and `001f` as [offset].
