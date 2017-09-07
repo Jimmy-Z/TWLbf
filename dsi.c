@@ -107,9 +107,20 @@ static inline void rol42_128(u64 *a){
 }
 
 // eMMC Encryption for MBR/Partitions (AES-CTR, with console-specific key)
-static inline void dsi_make_key(u64 *key, u64 console_id){
+static inline void dsi_make_key(u64 *key, u64 console_id, int is3DS){
 	u32 h = console_id >> 32, l = (u32)console_id;
-	u32 key_x[4] = {l, l ^ 0x24ee6906, h ^ 0xe65b601d, h};
+	u32 key_x[4];
+	if(!is3DS){
+		key_x[0] = l;
+		key_x[1] = l ^ 0x24ee6906;
+		key_x[2] = h ^ 0xe65b601d;
+		key_x[3] = h;
+	}else{
+		key_x[0] = (l ^ 0xb358a6af) | 0x80000000;
+		key_x[1] = 0x544e494e;
+		key_x[2] = 0x4f444e45;
+		key_x[3] = h ^ 0x08c267b7;
+	}
 	// Key = ((Key_X XOR Key_Y) + FFFEFB4E295902582A680F5F1A4F3E79h) ROL 42
 	// equivalent to F_XY in twltool/f_xy.c
 	xor_128(key, (u64*)key_x, DSi_KEY_Y);
@@ -118,10 +129,10 @@ static inline void dsi_make_key(u64 *key, u64 console_id){
 }
 
 void dsi_aes_ctr_crypt_block(const u8 *console_id, const u8 *emmc_cid,
-	const u8 *offset, const u8 *src){
+	const u8 *offset, const u8 *src, int is3DS){
 	crypto_init();
 	u64 key[2];
-	dsi_make_key(key, u64be(console_id));
+	dsi_make_key(key, u64be(console_id), is3DS);
 	u8 key_reversed[16];
 	byte_reverse_16(key_reversed, (u8*)key);
 	printf("AES-CTR KEY: %s\n", hexdump(key_reversed, 16, 1));
@@ -185,7 +196,7 @@ void dsi_brute_emmc_cid(const u8 *console_id, const u8 *emmc_cid_template,
 	u64 target_xor_h64 = u64be(target_xor);
 
 	u64 key[2];
-	dsi_make_key(key, u64be(console_id));
+	dsi_make_key(key, u64be(console_id), 0);
 	u8 key_reversed[16];
 	byte_reverse_16(key_reversed, (u8*)key);
 
@@ -254,7 +265,7 @@ void dsi_brute_emmc_cid(const u8 *console_id, const u8 *emmc_cid_template,
 }
 
 void dsi_brute_console_id(const u8 *console_id_template, const u8 *emmc_cid,
-	const u8 *offset, const u8 *src, const u8 *ver, int bcd)
+	const u8 *offset, const u8 *src, const u8 *ver, brute_mode_t mode)
 {
 	u64 tested = 0;
 	time_t start = time(0);
@@ -272,7 +283,7 @@ void dsi_brute_console_id(const u8 *console_id_template, const u8 *emmc_cid,
 	u8 ctr[16];
 	byte_reverse_16(ctr, emmc_cid_sha1);
 
-	if(bcd){
+	if(mode == BCD){
 		int succeed = 0;
 		u64 start64 = (u64be(console_id_template) & 0xfffff00000000000ull) + 0x100;
 		for (u64 i = 0; (i <= 9ull << 40) && !succeed; i += 1ull << 40) {
@@ -289,7 +300,7 @@ void dsi_brute_console_id(const u8 *console_id_template, const u8 *emmc_cid,
 												u64 console_id = start64 + i + j + k + l + m + n + o + p + q + r;
 
 												u64 key[2];
-												dsi_make_key(key, console_id);
+												dsi_make_key(key, console_id, 0);
 												u8 key_reversed[16];
 												byte_reverse_16(key_reversed, (u8*)key);
 
@@ -317,7 +328,8 @@ void dsi_brute_console_id(const u8 *console_id_template, const u8 *emmc_cid,
 		}
 	}else{
 		u64 start64 = u64be(console_id_template) & 0xffffffff00000000ull;
-		for (u64 i = 0; i <= 1ull << 32; ++i){
+		u64 total = mode != CTR ? 1ull << 32 : 1ull << 31;
+		for (u64 i = 0; i <= total; ++i){
 			tested = i;
 			// brute through the lower 32 bits
 			u64 console_id = start64 | i;
@@ -325,7 +337,7 @@ void dsi_brute_console_id(const u8 *console_id_template, const u8 *emmc_cid,
 				printf("testing %08x%1x???????\n", (u32)(console_id >> 32), ((u32)console_id) >> 28);
 			}
 			u64 key[2];
-			dsi_make_key(key, console_id);
+			dsi_make_key(key, console_id, mode == CTR);
 			u8 key_reversed[16];
 			byte_reverse_16(key_reversed, (u8*)key);
 
