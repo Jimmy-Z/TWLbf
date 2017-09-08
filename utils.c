@@ -38,12 +38,10 @@ int hex2bytes(u8 *out, unsigned byte_len, const char *in, int critical){
 	return 0;
 }
 
-#ifndef HEXDUMP_BUF_SIZE
-#define HEXDUMP_BUF_SIZE 0x100
-#endif
-
 static char hexdump_buf[HEXDUMP_BUF_SIZE];
-// CAUTION, this always assume you have a buffer big enough
+// CAUTION, this always assume the buffer is big enough
+// it uses a static buffer so the value is only valid until next call
+// and of course this is not thread safe
 const char *hexdump(const void *b, unsigned l, int space){
 	const u8 *p = (u8*)b;
 	char *out = hexdump_buf;
@@ -53,6 +51,52 @@ const char *hexdump(const void *b, unsigned l, int space){
 		if(space && i < l - 1){
 			*out++ = ' ';
 		}
+	}
+	return hexdump_buf;
+}
+
+void read_block_from_file(void *out, const char *file_name, size_t offset, size_t size) {
+	FILE * f = fopen(file_name, "rb");
+	if (f == NULL) {
+		fprintf(stderr, "can't read file: %s", file_name);
+		exit(-1);
+	}
+	fseek(f, offset, SEEK_SET);
+	size_t read = fread(out, 1, size, f);
+	if (read != size) {
+		fprintf(stderr, "failed to read %u bytes at offset %u from file: %s",
+			(unsigned)size, (unsigned)offset, file_name);
+		exit(-1);
+	}
+	fclose(f);
+}
+
+void dump_to_file(const char *file_name, const void *buf, size_t len) {
+	FILE *f = fopen(file_name, "r");
+	if (f != NULL) {
+		fclose(f);
+		fprintf(stderr, "%s exists, won't overwrite\n", file_name);
+		return;
+	}
+	f = fopen(file_name, "wb");
+	if (f == NULL) {
+		fprintf(stderr, "can't open file to write: %s\n", file_name);
+		return;
+	}
+	size_t written = fwrite(buf, 1, len, f);
+	if (written != len) {
+		fprintf(stderr, "failed to write %u bytes to %s\n",
+			(unsigned)len, file_name);
+	}
+	fclose(f);
+}
+
+// this stupid thing shares the hexdump_buf with hexdump
+const char *to_Mebi(size_t size) {
+	if (size % (1024 * 1024)) {
+		sprintf(hexdump_buf, "%.2f", (float)(((double)size) / 1024 / 1024));
+	} else {
+		sprintf(hexdump_buf, "%u", (unsigned)(size >> 20));
 	}
 	return hexdump_buf;
 }

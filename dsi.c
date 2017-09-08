@@ -6,6 +6,7 @@
 #include <assert.h>
 #include "dsi.h"
 #include "utils.h"
+#include "sector0.h"
 #include "crypto.h"
 
 #define DSI_PROFILE 0
@@ -99,7 +100,7 @@ static inline void add_128_64(u64 *a, u64 b){
 	}
 }
 
-// Answer to life, universe and everything.
+// Answer to life, universe and everything?
 static inline void rol42_128(u64 *a){
 	u64 t = a[1];
 	a[1] = (t << 42 ) | (a[0] >> 22);
@@ -129,7 +130,8 @@ static inline void dsi_make_key(u64 *key, u64 console_id, int is3DS){
 }
 
 void dsi_aes_ctr_crypt_block(const u8 *console_id, const u8 *emmc_cid,
-	const u8 *offset, const u8 *src, int is3DS){
+	const u8 *offset, const u8 *src, int is3DS)
+{
 	crypto_init();
 	u64 key[2];
 	dsi_make_key(key, u64be(console_id), is3DS);
@@ -164,6 +166,48 @@ void dsi_aes_ctr_crypt_block(const u8 *console_id, const u8 *emmc_cid,
 	printf("Decrypted:   %s\n", hexdump(out, 16, 1));
 }
 
+#define MBR_SIZE 0x200
+
+void dsi_decrypt_mbr(const u8 *console_id, const u8 *emmc_cid,
+	const char *in_file, const char *out_file)
+{
+	u8 mbr[MBR_SIZE];
+	read_block_from_file(mbr, in_file, 0, MBR_SIZE);
+
+	int is3DS = parse_ncsd(mbr);
+
+	crypto_init();
+	u64 key[2];
+	dsi_make_key(key, u64be(console_id), is3DS);
+	u8 key_reversed[16];
+	byte_reverse_16(key_reversed, (u8*)key);
+
+	aes_128_ecb_set_key(key_reversed);
+
+	u8 emmc_cid_sha1[20];
+	sha1_16(emmc_cid_sha1, emmc_cid);
+
+	for (unsigned offset = 0; offset < MBR_SIZE; offset += 16) {
+		u8 ctr[16];
+		byte_reverse_16(ctr, emmc_cid_sha1);
+
+		u8 xor[16];
+		aes_128_ecb_crypt_1(ctr, ctr);
+		byte_reverse_16(xor, ctr);
+
+		xor_128((u64*)(mbr + offset), (u64*)(mbr + offset), (u64*) xor );
+
+		add_128_64((u64*)emmc_cid_sha1, 1);
+	}
+
+	if (parse_mbr(mbr, is3DS, 1)) {
+		dump_to_file(out_file, mbr, MBR_SIZE);
+	}
+	else {
+		printf("invalid MBR, decryption failed\n");
+	}
+}
+
 #define BLOCK_SIZE 16
 #if DSI_PROFILE
 #define CHUNK_BITS 22
@@ -174,7 +218,8 @@ void dsi_aes_ctr_crypt_block(const u8 *console_id, const u8 *emmc_cid,
 #define CHUNK_COUNT (1 << (32 - CHUNK_BITS))
 
 void dsi_brute_emmc_cid(const u8 *console_id, const u8 *emmc_cid_template,
-	const u8 *offset, const u8 *src, const u8 *ver){
+	const u8 *offset, const u8 *src, const u8 *ver)
+{
 	u8 emmc_cid[16];
 	memcpy(emmc_cid, emmc_cid_template, sizeof(emmc_cid));
 

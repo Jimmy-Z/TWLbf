@@ -1,5 +1,5 @@
 PNAME = twlbf
-OBJS = $(PNAME).o utils.o dsi.o sha1_16.o
+OBJS = $(PNAME).o utils.o dsi.o sha1_16.o sector0.o
 MBEDTLS_OBJS = aes.o aesni.o
 CFLAGS += -std=c11 -Wall -O2
 
