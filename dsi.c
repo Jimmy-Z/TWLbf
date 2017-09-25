@@ -27,38 +27,6 @@ const u64 DSi_KEY_Y[2] =
 const u64 DSi_KEY_MAGIC[2] =
 	{0x2a680f5f1a4f3e79ull, 0xfffefb4e29590258ull};
 
-static inline u64 u64be(const u8 *in){
-	u64 out;
-	u8 *out8 = (u8*)&out;
-	out8[0] = in[7];
-	out8[1] = in[6];
-	out8[2] = in[5];
-	out8[3] = in[4];
-	out8[4] = in[3];
-	out8[5] = in[2];
-	out8[6] = in[1];
-	out8[7] = in[0];
-	return out;
-}
-
-static inline u32 u32be(const u8 *in){
-	u32 out;
-	u8 *out8 = (u8*)&out;
-	out8[0] = in[3];
-	out8[1] = in[2];
-	out8[2] = in[1];
-	out8[3] = in[0];
-	return out;
-}
-
-static inline u16 u16be(const u8 *in){
-	u16 out;
-	u8 *out8 = (u8*)&out;
-	out8[0] = in[1];
-	out8[1] = in[0];
-	return out;
-}
-
 // CAUTION this one doesn't work in-place
 static inline void byte_reverse_16(u8 *out, const u8 *in){
 	out[0] = in[15];
