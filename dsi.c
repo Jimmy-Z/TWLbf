@@ -172,12 +172,17 @@ void dsi_decrypt_mbr(const u8 *console_id, const u8 *emmc_cid,
 	}
 }
 
-static void aes_ctr(u8 *d, const u8 *ctr) {
-	u8 ctr_rev[16], xor[16], xor_rev[16];
-	byte_reverse_16(ctr_rev, ctr);
-	aes_128_ecb_crypt_1(xor, ctr_rev);
-	byte_reverse_16(xor_rev, xor);
-	xor_128((u64*)d, (u64*)d, (u64*)xor_rev);
+static void aes_ecb_rev(u8 *o, const u8 *i) {
+	u8 rev[16];
+	byte_reverse_16(rev, i);
+	aes_128_ecb_crypt_1(rev, rev);
+	byte_reverse_16(o, rev);
+}
+
+static void aes_ctr_1(u8 *d, const u8 *ctr) {
+	u8 xor[16];
+	aes_ecb_rev(xor, ctr);
+	xor_128((u64*)d, (u64*)d, (u64*)xor);
 }
 
 // http://problemkaputt.de/gbatek.htm#dsiesblockencryption
@@ -213,7 +218,7 @@ void dsi_es_block_crypt(const u8 *console_id,
 	memcpy(nonce, footer.nonce, sizeof(nonce));
 	u8 ctr[16] = { 0 };
 	memcpy(ctr + 1, nonce, sizeof(nonce));
-	aes_ctr(((u8*)&footer) + 0x10, ctr);
+	aes_ctr_1(((u8*)&footer) + 0x10, ctr);
 	// check decrypted footer
 	if (footer.fixed_3a != 0x3a) {
 		printf("footer decryption failed, offset 0x10 should be 0x3a, got 0x%02x\n", footer.fixed_3a);
@@ -233,9 +238,40 @@ void dsi_es_block_crypt(const u8 *console_id,
 		*(u32*)ctr = (block_size >> 4) + 1;
 		memcpy(ctr + 3, nonce, sizeof(nonce));
 		ctr[0xf] = 2;
-		aes_ctr(padding, ctr);
-		memcpy(input_buf + block_size, padding - remainder, sizeof(padding) - remainder);
+		aes_ctr_1(padding, ctr);
+		memcpy(input_buf + block_size, padding + remainder, sizeof(padding) - remainder);
+		block_size += sizeof(padding) - remainder;
 	}
+	// AES-CCM MAC
+	u8 mac[16];
+	*(u32*)mac = block_size;
+	memcpy(mac + 3, nonce, sizeof(nonce));
+	mac[15] = 0x3a;
+	aes_ecb_rev(mac, mac);
+	// printf("AES-CCM MAC: %s\n", hexdump(mac, 16, 1));
+	// AES-CCM CTR
+	ctr[0] = 0; ctr[1] = 0; ctr[2] = 0;
+	memcpy(ctr + 3, nonce, sizeof(nonce));
+	ctr[15] = 2;
+	// printf("AES-CCM CTR: %s\n", hexdump(ctr, 16, 1));
+	// what?
+	u8 S0[16] = { 0 };
+	aes_ctr_1(S0, ctr);
+	add_128_64((u64*)ctr, 1);
+	// printf("AES-CCM S0 : %s\n", hexdump(S0, 16, 1));
+	// CCM loop
+	for (unsigned i = 0; i < block_size; i += 16) {
+		aes_ctr_1(input_buf + i, ctr);
+		// printf("AES-CCM DUMP %s\n", hexdump(input_buf + i, 16, 1));
+		add_128_64((u64*)ctr, 1);
+		xor_128((u64*)mac, (u64*)mac, (u64*)(input_buf + i));
+		aes_ecb_rev(mac, mac);
+		// printf("AES-CCM MAC: %s\n", hexdump(mac_rev, 16, 1));
+	}
+	xor_128((u64*)mac, (u64*)mac, (u64*)S0);
+
+	printf("MAC in footer  : %s\n", hexdump(&footer, 16, 1));
+	printf("MAC calculated : %s\n", hexdump(mac, 16, 1));
 
 	free(input_buf);
 }
