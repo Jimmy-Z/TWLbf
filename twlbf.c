@@ -57,6 +57,11 @@ int main(int argc, const char *argv[]){
 		}else{
 			puts("invalid parameters");
 		}
+	}else if(argc == 5 && !strcmp(argv[1], "es_decrypt")){
+		// twlbf es_decrypt [Console ID] [in_file] [out_file]
+		u8 console_id[8];
+		hex2bytes(console_id, 8, argv[2], 1);
+		dsi_es_block_crypt(console_id, argv[3], argv[4]);
 	}else if(argc >= 2 && !strcmp(argv[1], "crypto_test")){
 		u8 key[16] = {1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8};
 		u8 src[32] = {8, 7, 6, 5, 4, 3, 2, 1, 1, 2, 3, 4, 5, 6, 7, 8,

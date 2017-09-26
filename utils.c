@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <malloc.h>
 #include <errno.h>
 #include <assert.h>
 #include "utils.h"
@@ -58,7 +59,7 @@ const char *hexdump(const void *b, unsigned l, int space){
 void read_block_from_file(void *out, const char *file_name, size_t offset, size_t size) {
 	FILE * f = fopen(file_name, "rb");
 	if (f == NULL) {
-		fprintf(stderr, "can't read file: %s", file_name);
+		fprintf(stderr, "can't read file: %s\n", file_name);
 		exit(-1);
 	}
 	fseek(f, offset, SEEK_SET);
@@ -69,6 +70,33 @@ void read_block_from_file(void *out, const char *file_name, size_t offset, size_
 		exit(-1);
 	}
 	fclose(f);
+}
+
+// read entire file to memory, don't use it on large files
+// the caller is resposible to free the memory
+void* read_file(const char *file_name, long *psize) {
+	FILE *f = fopen(file_name, "rb");
+	if (f == NULL) {
+		fprintf(stderr, "can't read file: %s\n", file_name);
+		exit(-1);
+	}
+	fseek(f, 0, SEEK_END);
+	*psize = ftell(f);
+	// printf("size: %u\n", (unsigned)*psize);
+	void *p = malloc(*psize);
+	if (p == NULL) {
+		fprintf(stderr, "failed to alloc buffer to read %s\n", file_name);
+		exit(-2);
+	}
+	fseek(f, 0, SEEK_SET);
+	size_t read = fread(p, 1, *psize, f);
+	if (read != *psize) {
+		fprintf(stderr, "failed to read entire file %s\n", file_name);
+		free(p);
+		exit(-1);
+	}
+	fclose(f);
+	return p;
 }
 
 void dump_to_file(const char *file_name, const void *buf, size_t len) {

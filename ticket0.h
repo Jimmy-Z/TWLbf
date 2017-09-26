@@ -75,6 +75,19 @@ typedef struct {
 
 static_assert(sizeof(tmd_content_v0_t) == 36, "invalid sizeof(tmd_contend_v0_t)");
 
+// used in ticket encryption
+// http://problemkaputt.de/gbatek.htm#dsiesblockencryption
+typedef struct {
+	uint8_t ccm_mac[0x10];
+	uint8_t fixed_3a;
+	uint8_t nonce[0x0c];
+	uint8_t len2;
+	uint8_t len1;
+	uint8_t len0;
+} PACKED es_block_footer_t;
+
+static_assert(sizeof(es_block_footer_t) == 0x20, "invalid sizeof(es_block_footer_t)");
+
 #ifdef _MSC_VER
 #pragma pack(pop)
 #endif

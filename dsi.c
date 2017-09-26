@@ -7,6 +7,7 @@
 #include "dsi.h"
 #include "utils.h"
 #include "sector0.h"
+#include "ticket0.h"
 #include "crypto.h"
 
 #define DSI_PROFILE 0
@@ -27,24 +28,15 @@ const u64 DSi_KEY_Y[2] =
 const u64 DSi_KEY_MAGIC[2] =
 	{0x2a680f5f1a4f3e79ull, 0xfffefb4e29590258ull};
 
+const u64 DSi_ES_KEY_Y[2] =
+	{0x72c9d0568b5acce5ull, 0xa9361239dce8179cull};
+
 // CAUTION this one doesn't work in-place
 static inline void byte_reverse_16(u8 *out, const u8 *in){
-	out[0] = in[15];
-	out[1] = in[14];
-	out[2] = in[13];
-	out[3] = in[12];
-	out[4] = in[11];
-	out[5] = in[10];
-	out[6] = in[9];
-	out[7] = in[8];
-	out[8] = in[7];
-	out[9] = in[6];
-	out[10] = in[5];
-	out[11] = in[4];
-	out[12] = in[3];
-	out[13] = in[2];
-	out[14] = in[1];
-	out[15] = in[0];
+	out[0] = in[15]; out[1] = in[14]; out[2] = in[13]; out[3] = in[12];
+	out[4] = in[11]; out[5] = in[10]; out[6] = in[9]; out[7] = in[8];
+	out[8] = in[7]; out[9] = in[6]; out[10] = in[5]; out[11] = in[4];
+	out[12] = in[3]; out[13] = in[2]; out[14] = in[1]; out[15] = in[0];
 }
 
 static inline void xor_128(u64 *x, const u64 *a, const u64 *b){
@@ -75,7 +67,7 @@ static inline void rol42_128(u64 *a){
 	a[0] = (a[0] << 42 ) | (t >> 22);
 }
 
-// eMMC Encryption for MBR/Partitions (AES-CTR, with console-specific key)
+// "eMMC Encryption for MBR/Partitions (AES-CTR, with console-specific key)"
 static inline void dsi_make_key(u64 *key, u64 console_id, int is3DS){
 	u32 h = console_id >> 32, l = (u32)console_id;
 	u32 key_x[4];
@@ -178,6 +170,74 @@ void dsi_decrypt_mbr(const u8 *console_id, const u8 *emmc_cid,
 	else {
 		printf("invalid MBR, decryption failed\n");
 	}
+}
+
+static void aes_ctr(u8 *d, const u8 *ctr) {
+	u8 ctr_rev[16], xor[16], xor_rev[16];
+	byte_reverse_16(ctr_rev, ctr);
+	aes_128_ecb_crypt_1(xor, ctr_rev);
+	byte_reverse_16(xor_rev, xor);
+	xor_128((u64*)d, (u64*)d, (u64*)xor_rev);
+}
+
+// http://problemkaputt.de/gbatek.htm#dsiesblockencryption
+// "DSi SD/MMC DSiware Files on Internal eMMC Storage"
+void dsi_es_block_crypt(const u8 *console_id,
+	const char *in_file, const char *out_file)
+{
+	crypto_init();
+	u32 key[4] = {
+		0x4e00004a,
+		0x4a00004e,
+		u32be(console_id) ^ 0xc80c4b72,
+		u32be(console_id + 4)
+	};
+	xor_128((u64*)key, (u64*)key, DSi_ES_KEY_Y);
+	add_128((u64*)key, DSi_KEY_MAGIC);
+	rol42_128((u64*)key);
+	u8 key_rev[16];
+	byte_reverse_16(key_rev, (u8*)key);
+	aes_128_ecb_set_key(key_rev);
+
+	long input_size;
+	u8 *input_buf = read_file(in_file, &input_size);
+	printf("file size %u, block size would be %06x\n",
+		(unsigned)input_size, (unsigned)(input_size - sizeof(es_block_footer_t)));
+	
+	// AES-CTR crypt later half of footer
+	es_block_footer_t footer;
+	u8 nonce[sizeof(footer.nonce)];
+	// save footer since it might be overwritten by padding
+	memcpy(&footer, input_buf + input_size - sizeof(es_block_footer_t), sizeof(es_block_footer_t));
+	// save nonce since the one in ther footer becomes gargage after footer verification
+	memcpy(nonce, footer.nonce, sizeof(nonce));
+	u8 ctr[16] = { 0 };
+	memcpy(ctr + 1, nonce, sizeof(nonce));
+	aes_ctr(((u8*)&footer) + 0x10, ctr);
+	// check decrypted footer
+	if (footer.fixed_3a != 0x3a) {
+		printf("footer decryption failed, offset 0x10 should be 0x3a, got 0x%02x\n", footer.fixed_3a);
+		return;
+	}
+	unsigned block_size = (((((unsigned)footer.len2) << 8) | footer.len1) << 8) | footer.len0;
+	if (block_size + sizeof(es_block_footer_t) != input_size) {
+		printf("block size in footer doesn't match, %06x != %06x\n",
+			block_size, (unsigned)(input_size - sizeof(es_block_footer_t)));
+		return;
+	}
+	// apply padding if not 16 bytes aligned
+	unsigned remainder = block_size & 0xf;
+	if (remainder > 0) {
+		u8 padding[16] = { 0 };
+		u8 ctr[16] = { 0 };
+		*(u32*)ctr = (block_size >> 4) + 1;
+		memcpy(ctr + 3, nonce, sizeof(nonce));
+		ctr[0xf] = 2;
+		aes_ctr(padding, ctr);
+		memcpy(input_buf + block_size, padding - remainder, sizeof(padding) - remainder);
+	}
+
+	free(input_buf);
 }
 
 #define BLOCK_SIZE 16
