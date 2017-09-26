@@ -187,7 +187,7 @@ static void aes_ctr_1(u8 *d, const u8 *ctr) {
 
 // http://problemkaputt.de/gbatek.htm#dsiesblockencryption
 // "DSi SD/MMC DSiware Files on Internal eMMC Storage"
-void dsi_es_block_crypt(const u8 *console_id,
+void dsi_es_block_crypt(const u8 *console_id, crypt_mode_t mode,
 	const char *in_file, const char *out_file)
 {
 	crypto_init();
@@ -209,22 +209,23 @@ void dsi_es_block_crypt(const u8 *console_id,
 	printf("file size %u, block size would be %06x\n",
 		(unsigned)input_size, (unsigned)(input_size - sizeof(es_block_footer_t)));
 	
-	// AES-CTR crypt later half of footer
-	es_block_footer_t footer;
-	u8 nonce[sizeof(footer.nonce)];
-	// save footer since it might be overwritten by padding
-	memcpy(&footer, input_buf + input_size - sizeof(es_block_footer_t), sizeof(es_block_footer_t));
-	// save nonce since the one in ther footer becomes gargage after footer verification
-	memcpy(nonce, footer.nonce, sizeof(nonce));
+	es_block_footer_t *footer, footer_backup;
+	footer = (es_block_footer_t*)(input_buf + input_size - sizeof(es_block_footer_t));
+	// backup footer since it might be overwritten by padding
+	// and also nonce in it becomes garbage after decryption
+	memcpy(&footer_backup, footer, sizeof(es_block_footer_t));
 	u8 ctr[16] = { 0 };
-	memcpy(ctr + 1, nonce, sizeof(nonce));
-	aes_ctr_1(((u8*)&footer) + 0x10, ctr);
+	if (mode == DECRYPT) {
+		// AES-CTR crypt later half of footer
+		memcpy(ctr + 1, footer_backup.nonce, AES_CCM_NONCE_LEN);
+		aes_ctr_1(footer->encrypted, ctr);
+	}
 	// check decrypted footer
-	if (footer.fixed_3a != 0x3a) {
-		printf("footer decryption failed, offset 0x10 should be 0x3a, got 0x%02x\n", footer.fixed_3a);
+	if (footer->fixed_3a != 0x3a) {
+		printf("footer offset 0x10 should be 0x3a, got 0x%02x\n", footer->fixed_3a);
 		return;
 	}
-	unsigned block_size = (((((unsigned)footer.len2) << 8) | footer.len1) << 8) | footer.len0;
+	unsigned block_size = u32be(footer->len32be) & 0xffffff;
 	if (block_size + sizeof(es_block_footer_t) != input_size) {
 		printf("block size in footer doesn't match, %06x != %06x\n",
 			block_size, (unsigned)(input_size - sizeof(es_block_footer_t)));
@@ -234,45 +235,84 @@ void dsi_es_block_crypt(const u8 *console_id,
 	unsigned remainder = block_size & 0xf;
 	if (remainder > 0) {
 		u8 padding[16] = { 0 };
-		u8 ctr[16] = { 0 };
-		*(u32*)ctr = (block_size >> 4) + 1;
-		memcpy(ctr + 3, nonce, sizeof(nonce));
-		ctr[0xf] = 2;
-		aes_ctr_1(padding, ctr);
+		if (mode == DECRYPT) {
+			u8 ctr[16] = { 0 };
+			*(u32*)ctr = (block_size >> 4) + 1;
+			memcpy(ctr + 3, footer_backup.nonce, AES_CCM_NONCE_LEN);
+			ctr[0xf] = 2;
+			aes_ctr_1(padding, ctr);
+		}
 		memcpy(input_buf + block_size, padding + remainder, sizeof(padding) - remainder);
 		block_size += sizeof(padding) - remainder;
 	}
 	// AES-CCM MAC
 	u8 mac[16];
 	*(u32*)mac = block_size;
-	memcpy(mac + 3, nonce, sizeof(nonce));
+	memcpy(mac + 3, footer_backup.nonce, AES_CCM_NONCE_LEN);
 	mac[15] = 0x3a;
 	aes_ecb_rev(mac, mac);
 	// printf("AES-CCM MAC: %s\n", hexdump(mac, 16, 1));
 	// AES-CCM CTR
 	ctr[0] = 0; ctr[1] = 0; ctr[2] = 0;
-	memcpy(ctr + 3, nonce, sizeof(nonce));
+	memcpy(ctr + 3, footer_backup.nonce, AES_CCM_NONCE_LEN);
 	ctr[15] = 2;
 	// printf("AES-CCM CTR: %s\n", hexdump(ctr, 16, 1));
-	// what?
-	u8 S0[16] = { 0 };
-	aes_ctr_1(S0, ctr);
+	u8 s0[16] = { 0 };
+	aes_ctr_1(s0, ctr);
 	add_128_64((u64*)ctr, 1);
-	// printf("AES-CCM S0 : %s\n", hexdump(S0, 16, 1));
+	// printf("AES-CCM S0 : %s\n", hexdump(s0, 16, 1));
 	// CCM loop
-	for (unsigned i = 0; i < block_size; i += 16) {
-		aes_ctr_1(input_buf + i, ctr);
-		// printf("AES-CCM DUMP %s\n", hexdump(input_buf + i, 16, 1));
-		add_128_64((u64*)ctr, 1);
-		xor_128((u64*)mac, (u64*)mac, (u64*)(input_buf + i));
-		aes_ecb_rev(mac, mac);
-		// printf("AES-CCM MAC: %s\n", hexdump(mac_rev, 16, 1));
+	if (mode == DECRYPT) {
+		for (unsigned i = 0; i < block_size; i += 16) {
+			aes_ctr_1(input_buf + i, ctr);
+			add_128_64((u64*)ctr, 1);
+			// printf("AES-CCM DUMP %s\n", hexdump(input_buf + i, 16, 1));
+			xor_128((u64*)mac, (u64*)mac, (u64*)(input_buf + i));
+			aes_ecb_rev(mac, mac);
+			// printf("AES-CCM MAC: %s\n", hexdump(mac_rev, 16, 1));
+		}
+	} else {
+		for (unsigned i = 0; i < block_size; i += 16) {
+			xor_128((u64*)mac, (u64*)mac, (u64*)(input_buf + i));
+			aes_ecb_rev(mac, mac);
+			aes_ctr_1(input_buf + i, ctr);
+			add_128_64((u64*)ctr, 1);
+		}
 	}
-	xor_128((u64*)mac, (u64*)mac, (u64*)S0);
+	xor_128((u64*)mac, (u64*)mac, (u64*)s0);
 
-	printf("MAC in footer  : %s\n", hexdump(&footer, 16, 1));
 	printf("MAC calculated : %s\n", hexdump(mac, 16, 1));
+	printf("MAC in footer  : %s\n", hexdump(footer_backup.ccm_mac, 16, 1));
 
+	if (mode == DECRYPT) {
+		if (!memcmp(mac, footer_backup.ccm_mac, 16)) {
+			puts("decryption successful");
+			if (remainder) {
+				// restore MAC in case it's been overwritten by padding
+				memcpy(footer->ccm_mac, footer_backup.ccm_mac, AES_CCM_MAC_LEN);
+			}
+			// restore nonce
+			memcpy(footer->nonce, footer_backup.nonce, AES_CCM_NONCE_LEN);
+			// I saved the footer with decrypted flag and size, but original MAC and nonce
+			// thus we can encrypt it back exactly
+			dump_to_file(out_file, input_buf, input_size);
+		} else {
+			puts("MAC verification failed");
+		}
+	} else {
+		puts("encrypted");
+		if (memcmp(mac, footer_backup.ccm_mac, 16)) {
+			puts("MAC changed, it's normal if you modified the decrypted content before");
+		}
+		memcpy(footer->ccm_mac, mac, AES_CCM_MAC_LEN);
+		// AES-CTR crypt later half of footer
+		ctr[0] = 0; ctr[13] = 0; ctr[14] = 0; ctr[15] = 0;
+		memcpy(ctr + 1, footer_backup.nonce, AES_CCM_NONCE_LEN);
+		aes_ctr_1(footer->encrypted, ctr);
+		// restore nonce
+		memcpy(footer->nonce, footer_backup.nonce, AES_CCM_NONCE_LEN);
+		dump_to_file(out_file, input_buf, input_size);
+	}
 	free(input_buf);
 }
 

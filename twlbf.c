@@ -11,10 +11,15 @@ const char * const CRYPT = "crypt";
 const char * const CRYPT_3DS = "crypt_3ds";
 const char * const DECRYPT_MBR = "decrypt_mbr";
 
+const char * const ENCRYPT_ES = "encrypt_es";
+const char * const DECRYPT_ES = "decrypt_es";
+
 const char * const EMMC_CID = "emmc_cid";
 const char * const CONSOLE_ID = "console_id";
 const char * const CONSOLE_ID_BCD = "console_id_bcd";
 const char * const CONSOLE_ID_3DS = "console_id_3ds";
+
+const char * const INVALID_PARAMETERS = "invalid parameters";
 
 int main(int argc, const char *argv[]){
 	if(argc == 6){
@@ -35,7 +40,7 @@ int main(int argc, const char *argv[]){
 		}else if(!strcmp(argv[1], DECRYPT_MBR)){
 			dsi_decrypt_mbr(console_id, emmc_cid, argv[4], argv[5]);
 		}else{
-			puts("invalid parameters");
+			puts(INVALID_PARAMETERS);
 		}
 	}else if(argc == 7){
 		// twlbf emmc_cid/console_id(_bcd) [Console ID] [EMMC CID] [offset] [src] [verify]
@@ -55,13 +60,22 @@ int main(int argc, const char *argv[]){
 		}else if(!strcmp(argv[1], "console_id_3ds")){
 			dsi_brute_console_id(console_id, emmc_cid, offset, src, verify, CTR);
 		}else{
-			puts("invalid parameters");
+			puts(INVALID_PARAMETERS);
 		}
-	}else if(argc == 5 && !strcmp(argv[1], "es_decrypt")){
+	}else if(argc == 5){
+		// BEWARE the decrypted content comes with a decrypted es block footer, thus incompatible with twltool
+		// with the benefit of preservation of original nonce, we can encrypt it back to original byte exact
 		// twlbf es_decrypt [Console ID] [in_file] [out_file]
+		// twlbf es_encrypt [Console ID] [in_file] [out_file]
 		u8 console_id[8];
 		hex2bytes(console_id, 8, argv[2], 1);
-		dsi_es_block_crypt(console_id, argv[3], argv[4]);
+		if (!strcmp(argv[1], ENCRYPT_ES)) {
+			dsi_es_block_crypt(console_id, ENCRYPT, argv[3], argv[4]);
+		} else if (!strcmp(argv[1], DECRYPT_ES)){
+			dsi_es_block_crypt(console_id, DECRYPT, argv[3], argv[4]);
+		} else {
+			puts(INVALID_PARAMETERS);
+		}
 	}else if(argc >= 2 && !strcmp(argv[1], "crypto_test")){
 		u8 key[16] = {1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8};
 		u8 src[32] = {8, 7, 6, 5, 4, 3, 2, 1, 1, 2, 3, 4, 5, 6, 7, 8,
@@ -79,7 +93,7 @@ int main(int argc, const char *argv[]){
 		aes_128_ecb_crypt(out, src, 32);
 		puts(hexdump(out, 32, 1));
 	}else{
-		puts("invalid parameters");
+		puts(INVALID_PARAMETERS);
 	}
 #ifdef _WIN32
 	system("pause");

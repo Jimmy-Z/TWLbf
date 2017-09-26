@@ -41,13 +41,18 @@ typedef enum {
 	CTR = 3
 } brute_mode_t;
 
+typedef enum {
+	ENCRYPT,
+	DECRYPT
+} crypt_mode_t;
+
 void dsi_aes_ctr_crypt_block(const u8 *console_id, const u8 *emmc_cid,
 	const u8 *offset, const u8 *src, int is3DS);
 
 void dsi_decrypt_mbr(const u8 *console_id, const u8 *emmc_cid,
 	const char *in_file, const char *out_file);
 
-void dsi_es_block_crypt(const u8 *console_id,
+void dsi_es_block_crypt(const u8 *console_id, crypt_mode_t mode,
 	const char *in_file, const char *out_file);
 
 void dsi_brute_emmc_cid(const u8 *console_id, const u8 *emmc_cid_template,

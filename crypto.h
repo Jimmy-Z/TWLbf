@@ -3,6 +3,8 @@
 
 #include "common.h"
 
+#define AES_BLOCK_LEN 16
+
 // definition in sha1_16.c
 void sha1_16(u8 out[16], const u8 in[16]);
 
