@@ -122,11 +122,15 @@ static inline void dsi_make_key(u64 *key, u64 console_id, int is3DS){
 		key_x[2] = 0x4f444e45;
 		key_x[3] = h ^ 0x08c267b7;
 	}
+	// printf("AES-CTR KEY_X:\n%s\n", hexdump(key_x, 16, 0));
 	// Key = ((Key_X XOR Key_Y) + FFFEFB4E295902582A680F5F1A4F3E79h) ROL 42
 	// equivalent to F_XY in twltool/f_xy.c
 	xor_128(key, (u64*)key_x, DSi_KEY_Y);
+	// printf("AES-CTR KEY: XOR KEY_Y:\n%s\n", hexdump(key, 16, 0));
 	add_128(key, DSi_KEY_MAGIC);
+	// printf("AES-CTR KEY: + MAGIC:\n%s\n", hexdump(key, 16, 0));
 	rol42_128(key);
+	// printf("AES-CTR KEY: ROL 42:\n%s\n", hexdump(key, 16, 0));
 }
 
 void dsi_aes_ctr_crypt_block(const u8 *console_id, const u8 *emmc_cid,
