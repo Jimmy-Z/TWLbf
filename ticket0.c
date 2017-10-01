@@ -17,8 +17,8 @@ int main(int argc, const char *argv[]) {
 		printf("Title ID: %016" PRIx64 "(%c%c%c%c)\n", u64be(tmd->title_id),
 			tmd->title_id[4], tmd->title_id[5], tmd->title_id[6], tmd->title_id[7]);
 		printf("Issuer: %s\n", tmd->issuer);
-		printf("public save: %u\n", u32be(tmd->public_save_size));
-		printf("private save: %u\n", u32be(tmd->private_save_size));
+		printf("public save: %u\n", tmd->public_save_size);
+		printf("private save: %u\n", tmd->private_save_size);
 		int num_content = u16be(tmd->num_content);
 		printf("Number of content: %d\n", num_content);
 		assert(num_content > 0);

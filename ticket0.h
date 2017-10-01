@@ -58,8 +58,8 @@ typedef struct {
 	uint8_t title_id[8];
 	uint8_t title_type[4];
 	uint8_t group_id[2];
-	uint8_t public_save_size[4];
-	uint8_t private_save_size[4];
+	uint32_t public_save_size;
+	uint32_t private_save_size;
 	uint8_t padding2[8];
 	uint8_t parent_control[0x10];
 	uint8_t padding3[0x1e];
