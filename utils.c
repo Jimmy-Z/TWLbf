@@ -56,6 +56,40 @@ const char *hexdump(const void *b, unsigned l, int space){
 	return hexdump_buf;
 }
 
+void print_hex(const void *b, unsigned len) {
+	const u8 *p = (u8*)b;
+	const unsigned cols = 16;
+	int rows = (len + cols - 1) / cols;
+	// first print on t1 until it exeeds 19 lines
+	for (unsigned i = 0; i < rows; ++i) {
+		printf("%04x:", i * cols);
+		for (unsigned j = 0; j < cols; ++j) {
+			if (j % 4 == 0) {
+				printf(" ");
+			}
+			int offset = i * cols + j;
+			if (offset < len) {
+				printf("%02x ", p[offset]);
+			} else {
+				printf("   ");
+			}
+		}
+		for (unsigned j = 0; j < cols; ++j) {
+			if (j % 4 == 0) {
+				printf(" ");
+			}
+			int offset = i * cols + j;
+			if (offset < len) {
+				char c = p[offset];
+				printf("%c", c >= 0x20 && c <= 0x7e ? c : '.');
+			} else {
+				printf(" ");
+			}
+		}
+		printf("\n");
+	}
+}
+
 void read_block_from_file(void *out, const char *file_name, size_t offset, size_t size) {
 	FILE * f = fopen(file_name, "rb");
 	if (f == NULL) {
@@ -74,7 +108,7 @@ void read_block_from_file(void *out, const char *file_name, size_t offset, size_
 
 // read entire file to memory, don't use it on large files
 // the caller is resposible to free the memory
-void* read_file(const char *file_name, long *psize) {
+void* read_file(const char *file_name, unsigned *psize) {
 	FILE *f = fopen(file_name, "rb");
 	if (f == NULL) {
 		fprintf(stderr, "can't read file: %s\n", file_name);
@@ -82,6 +116,10 @@ void* read_file(const char *file_name, long *psize) {
 	}
 	fseek(f, 0, SEEK_END);
 	*psize = ftell(f);
+	if (*psize == 0) {
+		fprintf(stderr, "file length is zero: %s\n", file_name);
+		exit(-1);
+	}
 	// printf("size: %u\n", (unsigned)*psize);
 	void *p = malloc(*psize);
 	if (p == NULL) {

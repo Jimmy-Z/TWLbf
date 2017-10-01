@@ -12,12 +12,11 @@ all: $(PNAME)_openssl $(PNAME)_mbedtls
 $(PNAME)_openssl: $(OBJS) crypto_openssl_evp.o
 	$(CC) -o $@ $^ -lcrypto
 
-# no default rule for this?
-$(PNAME)_mbedtls: $(OBJS) $(MBEDTLS_OBJS) crypto_mbedtls.o
-	$(CC) -o $@ $^
+$(PNAME)_mbedtls: $(OBJS) crypto_mbedtls.o
+	$(CC) --static -o $@ $^ -lmbedcrypto
 
 ticket0: ticket0.o utils.o
-	$(CC) -o $@ $^
+	$(CC) --static -o $@ $^ -lmbedcrypto
 
 clean:
 	rm $(PNAME)_* ticket0 *.o

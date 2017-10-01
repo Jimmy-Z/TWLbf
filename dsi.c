@@ -204,7 +204,7 @@ void dsi_es_block_crypt(const u8 *console_id, crypt_mode_t mode,
 	byte_reverse_16(key_rev, (u8*)key);
 	aes_128_ecb_set_key(key_rev);
 
-	long input_size;
+	unsigned input_size;
 	u8 *input_buf = read_file(in_file, &input_size);
 	printf("file size %u, block size would be %06x\n",
 		(unsigned)input_size, (unsigned)(input_size - sizeof(es_block_footer_t)));
@@ -233,7 +233,7 @@ void dsi_es_block_crypt(const u8 *console_id, crypt_mode_t mode,
 	}
 	// apply padding if not 16 bytes aligned
 	unsigned remainder = block_size & 0xf;
-	if (remainder > 0) {
+	if (remainder != 0) {
 		u8 padding[16] = { 0 };
 		if (mode == DECRYPT) {
 			u8 ctr[16] = { 0 };
@@ -285,7 +285,7 @@ void dsi_es_block_crypt(const u8 *console_id, crypt_mode_t mode,
 	printf("MAC in footer  : %s\n", hexdump(footer_backup.ccm_mac, 16, 1));
 
 	if (mode == DECRYPT) {
-		if (!memcmp(mac, footer_backup.ccm_mac, 16)) {
+		if (memcmp(mac, footer_backup.ccm_mac, 16) == 0) {
 			puts("decryption successful");
 			if (remainder) {
 				// restore MAC in case it's been overwritten by padding

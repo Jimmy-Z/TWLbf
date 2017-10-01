@@ -11,9 +11,11 @@ int hex2bytes(u8 *out, unsigned byte_len, const char *in, int critical);
 
 const char * hexdump(const void *a, unsigned l, int space);
 
+void print_hex(const void *b, unsigned len);
+
 void read_block_from_file(void *out, const char *file_name, size_t offset, size_t size);
 
-void* read_file(const char *file_name, long *psize);
+void* read_file(const char *file_name, unsigned *psize);
 
 void dump_to_file(const char *file_name, const void *buf, size_t len);
 
