@@ -4,6 +4,8 @@
 #include <malloc.h>
 #include <assert.h>
 #include <mbedtls/sha1.h>
+#include <mbedtls/rsa.h>
+#include <mbedtls/bignum.h>
 #include "ticket0.h"
 #include "utils.h"
 #include "dsi.h"
@@ -56,9 +58,35 @@ int main(int argc, const char *argv[]) {
 		}
 		free(tmd);
 		free(tmd_content);
-	} else if (argc == 3 && !strcmp(argv[1], "tik")) {
+	} else if (argc == 4 && !strcmp(argv[1], "tik")) {
+		// read cert.sys for XS00000006 public key
+		cert_t xs06;
+		read_block_from_file(&xs06, argv[2], 0, sizeof(cert_t));
+		mbedtls_rsa_context rsa_xs06;
+		mbedtls_rsa_init(&rsa_xs06, MBEDTLS_RSA_PKCS_V15, 0);
+		mbedtls_mpi_read_binary(&rsa_xs06.N, xs06.rsa_key, RSA_2048_LEN);
+		mbedtls_mpi_read_binary(&rsa_xs06.E, xs06.rsa_exp, RSA_EXP_LEN);
+		rsa_xs06.len = (mbedtls_mpi_bitlen(&rsa_xs06.N) + 7) >> 3;
+		// read ticket
 		ticket_v0_t *ticket = malloc(sizeof(ticket_v0_t));
-		read_block_from_file(ticket, argv[2], 0, sizeof(ticket_v0_t));
+		read_block_from_file(ticket, argv[3], 0, sizeof(ticket_v0_t));
+		// verify signature
+		mbedtls_rsa_public(&rsa_xs06, ticket->sig, ticket->sig);
+		// print_hex(ticket->sig, 256);
+		uint8_t sha1[20];
+#define SIG_OFFSET (sizeof(ticket->sig_type) + sizeof(ticket->sig) + sizeof(ticket->padding0))
+#define SIG_LEN (sizeof(ticket_v0_t) - SIG_OFFSET)
+		mbedtls_sha1(((uint8_t *)ticket) + SIG_OFFSET, SIG_LEN, sha1);
+#undef SIG_OFFST
+#undef SIG_LEN
+		if (memcmp(sha1, ticket->sig + RSA_2048_LEN - 20, 20)) {
+			printf("invalid signature\n");
+		} else {
+			printf("signature OK\n");
+
+		}
+		// info
+		printf("Ticket ID: %016" PRIx64 "\n", u64be(ticket->ticket_id));
 		printf("Title ID: %016" PRIx64 "\n", u64be(ticket->title_id));
 		printf("Issuer: %s\n", ticket->issuer);
 		free(ticket);

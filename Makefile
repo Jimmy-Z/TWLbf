@@ -20,3 +20,4 @@ ticket0: ticket0.o utils.o
 
 clean:
 	rm $(PNAME)_* ticket0 *.o
+

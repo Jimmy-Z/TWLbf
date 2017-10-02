@@ -108,6 +108,8 @@ typedef struct {
 
 static_assert(sizeof(es_block_footer_t) == 0x20, "invalid sizeof(es_block_footer_t)");
 
+#define RSA_EXP_LEN 4
+
 // used in cert.sys
 // http://problemkaputt.de/gbatek.htm#dsisdmmcfirmwaredevkpandcertsyscertificatefiles
 // "DSi SD/MMC Firmware dev.kp and cert.sys Certificate Files"
@@ -120,7 +122,7 @@ typedef struct {
 	char key_name[0x40];
 	uint32_t key_flags;
 	uint8_t rsa_key[RSA_2048_LEN];
-	uint8_t rsa_exp[4];
+	uint8_t rsa_exp[RSA_EXP_LEN];
 	uint8_t padding1[0x34];
 } PACKED cert_t;
 
