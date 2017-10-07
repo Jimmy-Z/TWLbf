@@ -164,10 +164,8 @@ void dsi_decrypt_mbr(const u8 *console_id, const u8 *emmc_cid,
 		add_128_64((u64*)emmc_cid_sha1, 1);
 	}
 
-	if (parse_mbr(mbr, is3DS, 1)) {
-		dump_to_file(out_file, mbr, MBR_SIZE);
-	}
-	else {
+	dump_to_file(out_file, mbr, MBR_SIZE);
+	if (!parse_mbr(mbr, is3DS, 1)) {
 		printf("invalid MBR, decryption failed\n");
 	}
 }
@@ -208,7 +206,7 @@ void dsi_es_block_crypt(const u8 *console_id, crypt_mode_t mode,
 	u8 *input_buf = read_file(in_file, &input_size);
 	printf("file size %u, block size would be %06x\n",
 		(unsigned)input_size, (unsigned)(input_size - sizeof(es_block_footer_t)));
-	
+
 	es_block_footer_t *footer, footer_backup;
 	footer = (es_block_footer_t*)(input_buf + input_size - sizeof(es_block_footer_t));
 	// backup footer since it might be overwritten by padding
